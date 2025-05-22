@@ -1,0 +1,132 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JoyVibe - Share Your Happiness</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <canvas id="stars-canvas"></canvas>
+  <div id="error-message" style="display: none; color: red; text-align: center; padding: 20px;">
+    Error: JavaScript failed to load. Please check the console (F12) for details.
+  </div>
+  <nav>
+    <div class="logo">JoyVibe</div>
+    <button class="menu-toggle" aria-expanded="false" aria-controls="nav-links" onclick="toggleMenu()">
+      <span class="hamburger"></span>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <button onclick="showSection('landing'); toggleMenu()">Home</button>
+      <button onclick="showSection('feed'); toggleMenu()">Explore</button>
+      <button onclick="showSection('cloud'); toggleMenu()">Dream-Cloud</button>
+      <button onclick="showSection('about'); toggleMenu()">About</button>
+    </div>
+  </nav>
+
+  <section id="landing" class="section">
+    <div class="hero">
+      <h1>What is your idea of happiness?</h1>
+      <textarea id="quick-post" maxlength="614" placeholder="Share anonymously (once every 30 minutes)..."></textarea>
+      <button onclick="quickPost()">Post</button>
+    </div>
+    <div class="recent-bubbles">
+      <h2>Recent Dreams</h2>
+      <div id="recent-posts" class="bubble-grid"></div>
+    </div>
+  </section>
+
+  <section id="feed" class="section hidden">
+    <div class="filter-bar">
+      <button onclick="loadFeed('newest')">Newest</button>
+      <button onclick="loadFeed('liked')">Most Liked</button>
+    </div>
+    <div id="feed-posts" class="bubble-grid"></div>
+  </section>
+
+  <section id="cloud" class="section hidden">
+    <div class="cloud-background"></div>
+    <h2>Dream-Cloud</h2>
+    <div class="cloud-controls">
+      <button onclick="toggleCloudPause()">Pause</button>
+      <button onclick="zoomCloud(1.1)">Zoom In</button>
+      <button onclick="zoomCloud(0.9)">Zoom Out</button>
+    </div>
+    <canvas id="cloud-canvas"></canvas>
+  </section>
+
+  <section id="about" class="section hidden">
+    <div class="about-content">
+      <h2>About JoyVibe</h2>
+      <p>In a world yearning for hope, JoyVibe emerges as a beacon of positivity, uniting hearts across nations in a shared vision for a brighter future. Our platform is more than a space to share dreams—it’s a movement to foster global harmony, where every aspiration, no matter how small, ignites inspiration. Here, your hopes and dreams take flight, amplified by the collective love and support of a worldwide community. The more a dream is liked and shared, the brighter it shines, becoming a powerful voice in our global chorus of optimism.</p>
+      <p>We envision JoyVibe as the heartbeat of humanity’s aspirations, a place where people from all corners of the earth come together to dream boldly and work toward a safer, better world. Our mission is to inspire you to speak out, to share what truly matters, and to let your vision shape the future. As dreams ripple across our platform, JoyVibe aims to become the world’s trusted gauge of global sentiment—a vibrant reflection of what unites us all.</p>
+      <p><strong>Join the movement. Share your dream today, and let your voice be heard in the symphony of hope.</strong></p>
+      <h3>Frequently Asked Questions</h3>
+      <details>
+        <summary>Is JoyVibe anonymous?</summary>
+        <p>Yes, JoyVibe is completely anonymous. We collect only your response to “What is your idea of happiness?”—your dreams, aspirations, and hopes. No personal information is required or stored.</p>
+      </details>
+      <details>
+        <summary>What is the maximum character count for a post?</summary>
+        <p>The maximum character count for a post is 614 characters, allowing you to fully express your dreams and aspirations.</p>
+      </details>
+      <details>
+        <summary>How does JoyVibe amplify dreams?</summary>
+        <p>Dreams shared on JoyVibe gain visibility through likes and shares from our global community. The more a dream is liked or shared, the more prominent it becomes, inspiring others and amplifying your voice in our symphony of hope.</p>
+      </details>
+      <details>
+        <summary>Can I edit or delete my post?</summary>
+        <p>To maintain anonymity and simplicity, posts cannot be edited or deleted once submitted. Feel free to share a new dream to express your evolving aspirations!</p>
+      </details>
+      <details>
+        <summary>How often can I post?</summary>
+        <p>You can post once every 30 minutes, allowing time for your dreams to resonate with the community while keeping the platform vibrant and fair.</p>
+      </details>
+      <button onclick="showSection('landing')">Share Your Dream</button>
+    </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="client.js"></script>
+</body>
+</html>
