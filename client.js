@@ -2,7 +2,7 @@ console.log('JoyVibe: Client script starting at', new Date().toLocaleString());
 
 // Supabase client
 const supabase = Supabase.createClient('https://cfyptrsiifzrnncpagxd.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI');
-
+const url = `https://joyvibe.world/?post=${id}`;
 // Hide error message
 const errorMessage = document.getElementById('error-message');
 if (errorMessage) {
