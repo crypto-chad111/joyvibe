@@ -44,7 +44,6 @@ function canPost() {
     return diff >= minutes30;
   } catch (err) {
     console.error('JoyVibe: localStorage error:', err);
-    console.log('JoyVibe: Fallback - allowing post');
     return true;
   }
 }
@@ -56,7 +55,6 @@ function updatePostTime() {
     localStorage.setItem('lastPostTime', Date.now().toString());
   } catch (err) {
     console.error('JoyVibe: localStorage error:', err);
-    console.log('JoyVibe: Skipping post time update');
   }
 }
 
@@ -70,12 +68,7 @@ function showSection(sectionId) {
       return;
     }
     sections.forEach(s => {
-      if (s.id === sectionId) {
-        s.classList.remove('hidden');
-        console.log('JoyVibe: Section shown:', sectionId);
-      } else {
-        s.classList.add('hidden');
-      }
+      s.classList.toggle('hidden', s.id !== sectionId);
     });
     if (sectionId === 'feed') loadFeed('newest');
     if (sectionId === 'cloud') initCloud();
@@ -89,7 +82,6 @@ function showSection(sectionId) {
 // Sanitize Text
 function sanitizeText(text) {
   try {
-    console.log('JoyVibe: Sanitizing text');
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -119,7 +111,7 @@ function createBubble(post, isCloud = false) {
         bubble.style.width = `${size}px`;
         bubble.style.height = `${size}px`;
         bubble.dataset.baseSize = size;
-        console.log('JoyVibe: Expanded bubble size:', size, 'px, text length:', textLength);
+        console.log('JoyVibe: Expanded bubble size:', size);
       } else {
         const words = post.text.split(' ').slice(0, 5).join(' ');
         text = words.length > 30 ? words.slice(0, 27) + '...' : words + (post.text.length > words.length ? '...' : '');
@@ -138,76 +130,50 @@ function createBubble(post, isCloud = false) {
       `;
       if (isExpanded) {
         const closeButton = bubble.querySelector('.close-button');
-        if (closeButton) {
-          closeButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            console.log('JoyVibe: Close button clicked for post:', post.id);
-            closeAllExpandedBubbles();
-          });
-        }
+        closeButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllExpandedBubbles();
+        });
         let scale = 1;
         let startDistance = 0;
         let translateY = 0;
         let startY = 0;
         bubble.addEventListener('touchstart', e => {
-          try {
-            if (e.touches.length === 2) {
-              const touch1 = e.touches[0];
-              const touch2 = e.touches[1];
-              startDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-              console.log('JoyVibe: Pinch start, distance:', startDistance);
-            } else if (e.touches.length === 1) {
-              startY = e.touches[0].clientY;
-              console.log('JoyVibe: Drag start, y:', startY);
-            }
-          } catch (err) {
-            console.error('JoyVibe: Error in touchstart:', err);
+          if (e.touches.length === 2) {
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            startDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+          } else if (e.touches.length === 1) {
+            startY = e.touches[0].clientY;
           }
         });
         bubble.addEventListener('touchmove', e => {
-          try {
-            e.preventDefault();
-            const content = bubble.querySelector('.bubble-content');
-            if (e.touches.length === 2) {
-              const touch1 = e.touches[0];
-              const touch2 = e.touches[1];
-              const currentDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-              scale = Math.min(1.5, Math.max(0.8, scale * (currentDistance / startDistance)));
-              const baseSize = parseFloat(bubble.dataset.baseSize);
-              bubble.style.width = `${baseSize * scale}px`;
-              bubble.style.height = `${baseSize * scale}px`;
-              content.style.maxHeight = `${(baseSize * scale) - 100}px`;
-              startDistance = currentDistance;
-              console.log('JoyVibe: Pinch move, scale:', scale);
-            } else if (e.touches.length === 1) {
-              const currentY = e.touches[0].clientY;
-              const maxTranslate = -(content.offsetHeight - (bubble.offsetHeight - 100));
-              translateY = Math.min(0, Math.max(maxTranslate, translateY + (currentY - startY)));
-              content.style.transform = `translateY(${translateY}px)`;
-              startY = currentY;
-              console.log('JoyVibe: Drag move, translateY:', translateY, 'max:', maxTranslate);
-            }
-          } catch (err) {
-            console.error('JoyVibe: Error in touchmove:', err);
+          e.preventDefault();
+          const content = bubble.querySelector('.bubble-content');
+          if (e.touches.length === 2) {
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+            scale = Math.min(1.5, Math.max(0.8, scale * (currentDistance / startDistance)));
+            const baseSize = parseFloat(bubble.dataset.baseSize);
+            bubble.style.width = `${baseSize * scale}px`;
+            bubble.style.height = `${baseSize * scale}px`;
+            content.style.maxHeight = `${(baseSize * scale) - 100}px`;
+            startDistance = currentDistance;
+          } else if (e.touches.length === 1) {
+            const currentY = e.touches[0].clientY;
+            const maxTranslate = -(content.offsetHeight - (bubble.offsetHeight - 100));
+            translateY = Math.min(0, Math.max(maxTranslate, translateY + (currentY - startY)));
+            content.style.transform = `translateY(${translateY}px)`;
+            startY = currentY;
           }
-        });
-        bubble.addEventListener('touchend', () => {
-          console.log('JoyVibe: Touch ended');
         });
       }
       bubble.addEventListener('click', (e) => {
-        try {
-          const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
-          if (!isAction && !isCloud && !bubble.classList.contains('expanded')) {
-            const postId = bubble.dataset.postId;
-            console.log('JoyVibe: Bubble clicked, post:', postId);
-            showExpandedBubble(post, bubble.parentElement.id, bubble);
-            e.stopPropagation();
-          } else {
-            console.log('JoyVibe: Clicked on action, expanded bubble, or cloud bubble, skipping expansion');
-          }
-        } catch (err) {
-          console.error('JoyVibe: Error in bubble click handler:', err);
+        const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
+        if (!isAction && !isCloud && !bubble.classList.contains('expanded')) {
+          showExpandedBubble(post, bubble.parentElement.id, bubble);
+          e.stopPropagation();
         }
       });
     }
@@ -228,20 +194,23 @@ async function loadRecentPosts() {
       return;
     }
     container.innerHTML = '';
-    const { data: posts } = await supabase
+    const { data: posts, error } = await supabase
       .from('posts')
       .select('*')
       .order('timestamp', { ascending: false })
       .limit(5);
-    if (posts) {
+    if (error) {
+      console.error('JoyVibe: Supabase error fetching recent posts:', error);
+      return;
+    }
+    if (posts && posts.length) {
       posts.forEach(post => {
         const bubble = createBubble(post);
         container.appendChild(bubble);
       });
-      console.log('JoyVibe: Recent posts loaded:', posts.length);
       observeBubbles();
     } else {
-      console.log('JoyVibe: No posts found');
+      container.innerHTML = '<p>No recent posts available.</p>';
     }
   } catch (err) {
     console.error('JoyVibe: Error in loadRecentPosts:', err);
@@ -258,24 +227,21 @@ async function loadFeed(sort) {
       return;
     }
     container.innerHTML = '';
-    let query = supabase
-      .from('posts')
-      .select('*');
-    if (sort === 'liked') {
-      query = query.order('likes', { ascending: false });
-    } else {
-      query = query.order('timestamp', { ascending: false });
+    let query = supabase.from('posts').select('*');
+    query = sort === 'liked' ? query.order('likes', { ascending: false }) : query.order('timestamp', { ascending: false });
+    const { data: posts, error } = await query;
+    if (error) {
+      console.error('JoyVibe: Supabase error fetching feed:', error);
+      return;
     }
-    const { data: posts } = await query;
-    if (posts) {
+    if (posts && posts.length) {
       posts.forEach(post => {
         const bubble = createBubble(post);
         container.appendChild(bubble);
       });
-      console.log('JoyVibe: Feed loaded:', posts.length);
       observeBubbles();
     } else {
-      console.log('JoyVibe: No posts found');
+      container.innerHTML = '<p>No posts available.</p>';
     }
   } catch (err) {
     console.error('JoyVibe: Error in loadFeed:', err);
@@ -285,15 +251,14 @@ async function loadFeed(sort) {
 // Observe Bubbles
 function observeBubbles() {
   try {
-    console.log('JoyVibe: Observing bubbles');
     const bubbles = document.querySelectorAll('.bubble:not(.expanded)');
-    if (bubbles.length === 0) {
+    if (!bubbles.length) {
       console.warn('JoyVibe: No bubbles to observe');
+      return;
     }
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          console.log('JoyVibe: Bubble visible:', entry.target.textContent.slice(0, 20));
           entry.target.classList.add('visible');
           observer.unobserve(entry.target);
         }
@@ -316,16 +281,18 @@ async function quickPost() {
     }
     const text = textArea.value.trim();
     if (!text) {
-      console.warn('JoyVibe: Empty post text');
+      alert('Please enter a post.');
       return;
     }
     if (!canPost()) {
-      console.warn('JoyVibe: Posting limit reached');
+      alert('You can only post once every 30 minutes.');
       return;
     }
     await submitPost(text);
+    textArea.value = '';
   } catch (err) {
     console.error('JoyVibe: Error in quickPost:', err);
+    alert('Failed to post. Check console for details.');
   }
 }
 
@@ -333,14 +300,6 @@ async function quickPost() {
 async function submitPost(text) {
   try {
     console.log('JoyVibe: Submitting post:', text);
-    if (!text) {
-      console.warn('JoyVibe: Empty post text');
-      return;
-    }
-    if (!canPost()) {
-      console.warn('JoyVibe: Posting limit reached');
-      return;
-    }
     const post = {
       id: Date.now(),
       text: sanitizeText(text),
@@ -352,20 +311,20 @@ async function submitPost(text) {
       .from('posts')
       .insert([post]);
     if (error) {
-      console.error('JoyVibe: Failed to submit post:', error);
-      return;
+      console.error('JoyVibe: Supabase error inserting post:', error);
+      throw error;
     }
     updatePostTime();
-    document.getElementById('quick-post').value = '';
+    console.log('JoyVibe: Post submitted:', post.id);
   } catch (err) {
     console.error('JoyVibe: Error in submitPost:', err);
+    throw err;
   }
 }
 
 // Like/Dislike/Share
 async function likePost(id) {
   try {
-    console.log('JoyVibe: Attempting to like post:', id);
     const userId = localStorage.getItem('userId') || Date.now().toString();
     localStorage.setItem('userId', userId);
     const { data: existing } = await supabase
@@ -375,7 +334,6 @@ async function likePost(id) {
       .eq('post_id', id)
       .single();
     if (existing) {
-      console.log('JoyVibe: User already acted on post', id, ':', existing.action);
       return;
     }
     const { error: insertError } = await supabase
@@ -392,7 +350,6 @@ async function likePost(id) {
     if (updateError) {
       console.error('JoyVibe: Failed to update likes:', updateError);
     }
-    console.log('JoyVibe: Liked post', id);
   } catch (err) {
     console.error('JoyVibe: Error in likePost:', err);
   }
@@ -400,7 +357,6 @@ async function likePost(id) {
 
 async function dislikePost(id) {
   try {
-    console.log('JoyVibe: Attempting to dislike post:', id);
     const userId = localStorage.getItem('userId') || Date.now().toString();
     localStorage.setItem('userId', userId);
     const { data: existing } = await supabase
@@ -410,7 +366,6 @@ async function dislikePost(id) {
       .eq('post_id', id)
       .single();
     if (existing) {
-      console.log('JoyVibe: User already acted on post', id, ':', existing.action);
       return;
     }
     const { error: insertError } = await supabase
@@ -427,7 +382,6 @@ async function dislikePost(id) {
     if (updateError) {
       console.error('JoyVibe: Failed to update dislikes:', updateError);
     }
-    console.log('JoyVibe: Disliked post', id);
   } catch (err) {
     console.error('JoyVibe: Error in dislikePost:', err);
   }
@@ -435,9 +389,7 @@ async function dislikePost(id) {
 
 function sharePost(id) {
   try {
-    console.log('JoyVibe: Sharing post:', id);
     const url = `https://joyvibe.world/?post=${id}`;
-    console.log('JoyVibe: Generated URL:', url);
     navigator.clipboard.writeText(url).then(() => {
       console.log('JoyVibe: URL copied');
     }).catch(err => {
@@ -451,7 +403,7 @@ function sharePost(id) {
 // Expanded Bubble Functions
 async function showExpandedBubble(post, containerId, bubbleElement) {
   try {
-    console.log('JoyVibe: Showing expanded bubble for post:', post.id, 'in container:', containerId);
+    console.log('JoyVibe: Showing expanded bubble for post:', post.id);
     closeAllExpandedBubbles();
     expandedBubbleId = post.id;
     originalContainerId = containerId;
@@ -468,7 +420,6 @@ async function showExpandedBubble(post, containerId, bubbleElement) {
 
     if (bubbleElement) {
       bubbleElement.style.display = 'none';
-      console.log('JoyVibe: Hid original bubble for post:', post.id);
     }
 
     const bubble = createBubble(post);
@@ -485,8 +436,6 @@ async function showExpandedBubble(post, containerId, bubbleElement) {
     } else {
       document.body.appendChild(bubble);
     }
-
-    console.log('JoyVibe: Expanded bubble shown, cloudPaused:', cloudPaused);
   } catch (err) {
     console.error('JoyVibe: Error in showExpandedBubble:', err);
   }
@@ -494,24 +443,20 @@ async function showExpandedBubble(post, containerId, bubbleElement) {
 
 function closeAllExpandedBubbles() {
   try {
-    console.log('JoyVibe: Closing all expanded bubbles, current ID:', expandedBubbleId);
     const expandedBubbles = document.querySelectorAll('.bubble.expanded');
     expandedBubbles.forEach(bubble => {
       const containerId = originalContainerId || (bubble.closest('#cloud') ? 'cloud-canvas' : null);
-      console.log('JoyVibe: Found expanded bubble in container:', containerId, 'postId:', bubble.dataset.postId);
       bubble.remove();
       if (containerId === 'cloud-canvas') {
         cloudPaused = false;
-        requestAnimationFrame(animate);
+        if (canvas) requestAnimationFrame(animate);
       } else if (originalBubble && originalContainerId) {
         originalBubble.style.display = '';
-        console.log('JoyVibe: Restored original bubble for post:', bubble.dataset.postId);
       }
     });
     expandedBubbleId = null;
     originalBubble = null;
     originalContainerId = null;
-    console.log('JoyVibe: All expanded bubbles closed, cloudPaused:', cloudPaused);
   } catch (err) {
     console.error('JoyVibe: Error in closeAllExpandedBubbles:', err);
   }
@@ -527,6 +472,10 @@ function initStars() {
       return;
     }
     const starsCtx = starsCanvas.getContext('2d');
+    if (!starsCtx) {
+      console.error('JoyVibe: Failed to get stars canvas context');
+      return;
+    }
     starsCanvas.width = window.innerWidth;
     starsCanvas.height = window.innerHeight;
 
@@ -572,8 +521,8 @@ function initStars() {
 
 // Dream-Cloud Animation
 function animate() {
-  if (cloudPaused) {
-    console.log('JoyVibe: Animation paused');
+  if (cloudPaused || !ctx || !canvas) {
+    console.log('JoyVibe: Animation paused or canvas not ready');
     return;
   }
   try {
@@ -634,8 +583,8 @@ function animate() {
       ctx.font = '14px Poppins';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(b.text, b.x, b.y - 10);
-      ctx.fillText(`❤️ ${b.likes}`, b.x, b.y + 10);
+      ctx.fillText(b.text || 'Post', b.x, b.y - 10);
+      ctx.fillText(`❤️ ${b.likes || 0}`, b.x, b.y + 10);
       ctx.shadowBlur = 0;
     });
 
@@ -647,7 +596,6 @@ function animate() {
         const dy = b2.y - b1.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < b1.radius + b2.radius) {
-          console.log('JoyVibe: Collision detected between bubbles', b1.id, b2.id);
           const angle = Math.atan2(dy, dx);
           const sin = Math.sin(angle);
           const cos = Math.cos(angle);
@@ -685,114 +633,105 @@ async function initCloud() {
     }
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    console.log('JoyVibe: Canvas initialized:', canvas.width, 'x', canvas.height);
 
-    const { data: posts } = await supabase
+    const { data: posts, error } = await supabase
       .from('posts')
       .select('*')
       .order('likes', { ascending: false })
       .limit(20);
-    if (posts) {
-      bubbles = posts.map(post => ({
-        id: post.id,
-        text: post.text.split(' ')[0],
-        likes: post.likes || 0,
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 1,
-        vy: (Math.random() - 0.5) * 1,
-        radius: 40
-      }));
-      console.log('JoyVibe: Cloud bubbles created:', bubbles.length);
-    } else {
-      console.log('JoyVibe: No posts for cloud');
-      bubbles = [];
+    if (error) {
+      console.error('JoyVibe: Supabase error fetching cloud posts:', error);
+      return;
     }
+    bubbles = posts && posts.length ? posts.map(post => ({
+      id: post.id,
+      text: post.text.split(' ')[0],
+      likes: post.likes || 0,
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 1,
+      vy: (Math.random() - 0.5) * 1,
+      radius: 40
+    })) : [];
+    console.log('JoyVibe: Cloud bubbles created:', bubbles.length);
 
     canvas.onclick = e => {
-      try {
-        console.log('JoyVibe: Canvas clicked');
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        console.log('JoyVibe: Mouse coordinates:', mouseX, mouseY);
-        for (let b of bubbles) {
-          const dist = Math.sqrt((mouseX - b.x) ** 2 + (mouseY - b.y) ** 2);
-          console.log('JoyVibe: Check bubble', b.id, 'at', b.x, b.y, 'distance:', dist);
-          if (dist <= b.radius) {
-            supabase
-              .from('posts')
-              .select('*')
-              .eq('id', b.id)
-              .single()
-              .then(({ data: post }) => {
-                if (post) {
-                  console.log('JoyVibe: Orb clicked, showing expanded bubble:', post.id);
-                  showExpandedBubble(post, 'cloud-canvas', null);
-                } else {
-                  console.error('JoyVibe: Post not found for bubble:', b.id);
-                }
-              });
-            break;
-          }
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      for (let b of bubbles) {
+        const dist = Math.sqrt((mouseX - b.x) ** 2 + (mouseY - b.y) ** 2);
+        if (dist <= b.radius) {
+          supabase
+            .from('posts')
+            .select('*')
+            .eq('id', b.id)
+            .single()
+            .then(({ data: post, error }) => {
+              if (error) {
+                console.error('JoyVibe: Error fetching post:', error);
+                return;
+              }
+              if (post) {
+                showExpandedBubble(post, 'cloud-canvas', null);
+              }
+            });
+          break;
         }
-      } catch (err) {
-        console.error('JoyVibe: Error in canvas onclick:', err);
       }
     };
 
     canvas.onmousemove = e => {
-      try {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        hoveredBubbleId = null;
-        bubbles.forEach(b => {
-          const dist = Math.sqrt((mouseX - b.x) ** 2 + (mouseY - b.y) ** 2);
-          if (dist <= b.radius) {
-            hoveredBubbleId = b.id;
-            console.log('JoyVibe: Hovering over bubble', b.id);
-          }
-        });
-      } catch (err) {
-        console.error('JoyVibe: Error in canvas onmousemove:', err);
-      }
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      hoveredBubbleId = null;
+      bubbles.forEach(b => {
+        const dist = Math.sqrt((mouseX - b.x) ** 2 + (mouseY - b.y) ** 2);
+        if (dist <= b.radius) {
+          hoveredBubbleId = b.id;
+        }
+      });
     };
+
     canvas.onmouseleave = () => {
       hoveredBubbleId = null;
-      console.log('JoyVibe: Mouse left canvas');
     };
 
     canvas.ontouchstart = e => {
-      try {
-        e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches[0];
-        const touchX = touch.clientX - rect.left;
-        const touchY = touch.clientY - rect.top;
-        hoveredBubbleId = null;
-        bubbles.forEach(b => {
-          const dist = Math.sqrt((touchX - b.x) ** 2 + (touchY - b.y) ** 2);
-          if (dist <= b.radius) {
-            hoveredBubbleId = b.id;
-            console.log('JoyVibe: Touching bubble', b.id);
-            const post = posts.find(p => p.id === b.id);
-            if (post) {
-              showExpandedBubble(post, 'cloud-canvas', null);
-            }
-          }
-        });
-      } catch (err) {
-        console.error('JoyVibe: Error in canvas ontouchstart:', err);
-      }
-    };
-    canvas.ontouchend = () => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
       hoveredBubbleId = null;
-      console.log('JoyVibe: Touch ended');
+      bubbles.forEach(b => {
+        const dist = Math.sqrt((touchX - b.x) ** 2 + (touchY - b.y) ** 2);
+        if (dist <= b.radius) {
+          hoveredBubbleId = b.id;
+          supabase
+            .from('posts')
+            .select('*')
+            .eq('id', b.id)
+            .single()
+            .then(({ data: post, error }) => {
+              if (error) {
+                console.error('JoyVibe: Error fetching post:', error);
+                return;
+              }
+              if (post) {
+                showExpandedBubble(post, 'cloud-canvas', null);
+              }
+            });
+        }
+      });
     };
 
-    console.log('JoyVibe: Starting canvas animation');
-    if (!cloudPaused) requestAnimationFrame(animate);
+    canvas.ontouchend = () => {
+      hoveredBubbleId = null;
+    };
+
+    if (!cloudPaused && bubbles.length) requestAnimationFrame(animate);
   } catch (err) {
     console.error('JoyVibe: Error in initCloud:', err);
   }
@@ -801,10 +740,8 @@ async function initCloud() {
 // Cloud Controls
 function toggleCloudPause() {
   try {
-    console.log('JoyVibe: Toggling cloud pause');
     cloudPaused = !cloudPaused;
-    console.log('JoyVibe: cloudPaused set to:', cloudPaused);
-    if (!cloudPaused) requestAnimationFrame(animate);
+    if (!cloudPaused && canvas && ctx) requestAnimationFrame(animate);
   } catch (err) {
     console.error('JoyVibe: Error in toggleCloudPause:', err);
   }
@@ -812,7 +749,6 @@ function toggleCloudPause() {
 
 function zoomCloud(factor) {
   try {
-    console.log('JoyVibe: Zooming cloud:', factor);
     cloudZoom *= factor;
   } catch (err) {
     console.error('JoyVibe: Error in zoomCloud:', err);
@@ -821,13 +757,13 @@ function zoomCloud(factor) {
 
 // Real-Time Subscription
 supabase
-  .from('posts')
-  .on('INSERT', payload => {
+  .channel('posts')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
     console.log('JoyVibe: New post received:', payload.new.id);
     loadRecentPosts();
     loadFeed('newest');
   })
-  .on('UPDATE', async payload => {
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async payload => {
     console.log('JoyVibe: Post updated:', payload.new.id);
     const userId = localStorage.getItem('userId') || Date.now().toString();
     const { data: userAction } = await supabase
@@ -841,9 +777,9 @@ supabase
   })
   .subscribe();
 
+// Update Bubble
 async function updateBubble(post) {
   try {
-    console.log('JoyVibe: Updating bubble for post:', post.id);
     const bubbles = document.querySelectorAll(`.bubble[data-post-id="${post.id}"]`);
     bubbles.forEach(bubble => {
       const isExpanded = bubble.classList.contains('expanded');
@@ -876,20 +812,13 @@ async function updateBubble(post) {
 
 // Handle Outside Clicks
 document.addEventListener('click', e => {
-  try {
-    const bubble = e.target.closest('.bubble.expanded');
-    const canvas = e.target.closest('#cloud-canvas');
-    const controls = e.target.closest('.cloud-controls');
-    const nav = e.target.closest('nav');
-    const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
-    if (!bubble && !canvas && !controls && !nav && !isAction && expandedBubbleId) {
-      console.log('JoyVibe: Clicked outside expanded bubble');
-      closeAllExpandedBubbles();
-    } else {
-      console.log('JoyVibe: Click within bubble, canvas, controls, nav, or action, not closing');
-    }
-  } catch (err) {
-    console.error('JoyVibe: Error in document click:', err);
+  const bubble = e.target.closest('.bubble.expanded');
+  const canvas = e.target.closest('#cloud-canvas');
+  const controls = e.target.closest('.cloud-controls');
+  const nav = e.target.closest('nav');
+  const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
+  if (!bubble && !canvas && !controls && !nav && !isAction && expandedBubbleId) {
+    closeAllExpandedBubbles();
   }
 });
 
@@ -897,16 +826,12 @@ document.addEventListener('click', e => {
 try {
   console.log('JoyVibe: Initializing');
   const errorMessage = document.getElementById('error-message');
-  if (errorMessage) {
-    errorMessage.style.display = 'none';
-  }
+  if (errorMessage) errorMessage.style.display = 'none';
   initStars();
   loadRecentPosts();
   showSection('landing');
 } catch (err) {
   console.error('JoyVibe: Initialization error:', err);
   const errorMessage = document.getElementById('error-message');
-  if (errorMessage) {
-    errorMessage.style.display = 'block';
-  }
+  if (errorMessage) errorMessage.style.display = 'block';
 }
