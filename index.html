@@ -644,7 +644,7 @@
     </div>
   </section>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.0/dist/umd/supabase.min.js"></script>
   <script>
     // Global Error Handler
     window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -655,12 +655,7 @@
 
     // Initialize Supabase
     let supabase;
-    try {
-      supabase = Supabase.createClient('https://cfyptrsiifzrnncpagxd.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI');
-      console.log('JoyVibe: Supabase initialized');
-    } catch (err) {
-      console.error('JoyVibe: Failed to initialize Supabase:', err);
-    }
+    let supabaseInitialized = false;
 
     // State
     let cloudPaused = false;
@@ -923,30 +918,56 @@
           return;
         }
         container.innerHTML = '<p>Loading...</p>';
-        const { data: posts, error } = await supabase
-          .from('posts')
-          .select('*')
-          .order('timestamp', { ascending: false })
-          .limit(5);
-        container.innerHTML = '';
-        if (error) {
-          console.error('JoyVibe: Supabase error fetching recent posts:', error);
-          container.innerHTML = '<p>Failed to load posts.</p>';
-          return;
-        }
-        if (posts && posts.length) {
-          posts.forEach(post => {
-            const bubble = createBubble(post);
-            container.appendChild(bubble);
-          });
-          observeBubbles();
+
+        let posts = [];
+        if (supabase && supabaseInitialized) {
+          const { data, error } = await supabase
+            .from('posts')
+            .select('*')
+            .order('timestamp', { ascending: false })
+            .limit(5);
+          if (error) {
+            console.error('JoyVibe: Supabase error fetching recent posts:', error);
+            throw error;
+          }
+          posts = data || [];
         } else {
-          container.innerHTML = '<p>No recent posts available.</p>';
+          console.warn('JoyVibe: Supabase not initialized, using fallback');
         }
+
+        container.innerHTML = '';
+        if (posts.length === 0) {
+          console.log('JoyVibe: No posts, adding fallback bubble');
+          posts.push({
+            id: 'fallback-1',
+            text: 'Welcome to JoyVibe! Share your dreams!',
+            likes: 0,
+            dislikes: 0,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        posts.forEach(post => {
+          const bubble = createBubble(post);
+          container.appendChild(bubble);
+        });
+        observeBubbles();
       } catch (err) {
         console.error('JoyVibe: Error in loadRecentPosts:', err);
         const container = document.getElementById('recent-posts');
-        if (container) container.innerHTML = '<p>Error loading posts.</p>';
+        if (container) {
+          container.innerHTML = '';
+          const fallbackPost = {
+            id: 'fallback-error',
+            text: 'Welcome to JoyVibe! Share your dreams!',
+            likes: 0,
+            dislikes: 0,
+            timestamp: new Date().toISOString()
+          };
+          const bubble = createBubble(fallbackPost);
+          container.appendChild(bubble);
+          observeBubbles();
+        }
       }
     }
 
@@ -960,28 +981,54 @@
           return;
         }
         container.innerHTML = '<p>Loading...</p>';
-        let query = supabase.from('posts').select('*');
-        query = sort === 'liked' ? query.order('likes', { ascending: false }) : query.order('timestamp', { ascending: false });
-        const { data: posts, error } = await query;
-        container.innerHTML = '';
-        if (error) {
-          console.error('JoyVibe: Supabase error fetching feed:', error);
-          container.innerHTML = '<p>Failed to load posts.</p>';
-          return;
-        }
-        if (posts && posts.length) {
-          posts.forEach(post => {
-            const bubble = createBubble(post);
-            container.appendChild(bubble);
-          });
-          observeBubbles();
+
+        let posts = [];
+        if (supabase && supabaseInitialized) {
+          let query = supabase.from('posts').select('*');
+          query = sort === 'liked' ? query.order('likes', { ascending: false }) : query.order('timestamp', { ascending: false });
+          const { data, error } = await query;
+          if (error) {
+            console.error('JoyVibe: Supabase error fetching feed:', error);
+            throw error;
+          }
+          posts = data || [];
         } else {
-          container.innerHTML = '<p>No posts available.</p>';
+          console.warn('JoyVibe: Supabase not initialized, using fallback');
         }
+
+        container.innerHTML = '';
+        if (posts.length === 0) {
+          console.log('JoyVibe: No posts, adding fallback bubble');
+          posts.push({
+            id: 'fallback-feed-1',
+            text: 'Explore dreams on JoyVibe!',
+            likes: 0,
+            dislikes: 0,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        posts.forEach(post => {
+          const bubble = createBubble(post);
+          container.appendChild(bubble);
+        });
+        observeBubbles();
       } catch (err) {
         console.error('JoyVibe: Error in loadFeed:', err);
         const container = document.getElementById('feed-posts');
-        if (container) container.innerHTML = '<p>Error loading posts.</p>';
+        if (container) {
+          container.innerHTML = '';
+          const fallbackPost = {
+            id: 'fallback-feed-error',
+            text: 'Explore dreams on JoyVibe!',
+            likes: 0,
+            dislikes: 0,
+            timestamp: new Date().toISOString()
+          };
+          const bubble = createBubble(fallbackPost);
+          container.appendChild(bubble);
+          observeBubbles();
+        }
       }
     }
 
@@ -1026,12 +1073,17 @@
           alert('You can only post once every 30 minutes.');
           return;
         }
+        if (!supabase || !supabaseInitialized) {
+          console.error('JoyVibe: Supabase not initialized');
+          alert('Failed to post: Database service unavailable. Please try again later.');
+          return;
+        }
         await submitPost(text);
         textArea.value = '';
         alert('Post submitted successfully!');
       } catch (err) {
         console.error('JoyVibe: Error in quickPost:', err);
-        alert('Failed to post: ' + (err.message || 'Check console for details.'));
+        alert('Failed to post: ' + (err.message || 'Unknown error. Check console for details.'));
       }
     }
 
@@ -1039,6 +1091,10 @@
     async function submitPost(text) {
       try {
         console.log('JoyVibe: Submitting post:', text);
+        if (!supabase || !supabaseInitialized) {
+          console.error('JoyVibe: Supabase not initialized in submitPost');
+          throw new Error('Database service not initialized');
+        }
         const post = {
           text: sanitizeText(text),
           likes: 0,
@@ -1050,7 +1106,7 @@
           .insert([post]);
         if (error) {
           console.error('JoyVibe: Supabase error inserting post:', error);
-          throw new Error(error.message || 'Unknown Supabase error');
+          throw new Error(error.message || 'Failed to insert post');
         }
         updatePostTime();
         console.log('JoyVibe: Post submitted successfully');
@@ -1063,6 +1119,10 @@
     // Like/Dislike/Share
     async function likePost(id) {
       try {
+        if (!supabase || !supabaseInitialized) {
+          console.error('JoyVibe: Supabase not initialized for likePost');
+          return;
+        }
         const userId = localStorage.getItem('userId') || Date.now().toString();
         localStorage.setItem('userId', userId);
         const { data: existing } = await supabase
@@ -1095,6 +1155,10 @@
 
     async function dislikePost(id) {
       try {
+        if (!supabase || !supabaseInitialized) {
+          console.error('JoyVibe: Supabase not initialized for dislikePost');
+          return;
+        }
         const userId = localStorage.getItem('userId') || Date.now().toString();
         localStorage.setItem('userId', userId);
         const { data: existing } = await supabase
@@ -1147,14 +1211,16 @@
         originalContainerId = containerId;
         originalBubble = bubbleElement;
 
-        const userId = localStorage.getItem('userId') || Date.now().toString();
-        const { data: userAction } = await supabase
-          .from('user_actions')
-          .select('action')
-          .eq('user_id', userId)
-          .eq('post_id', post.id)
-          .single();
-        post.userAction = userAction ? userAction.action : null;
+        if (supabase && supabaseInitialized) {
+          const userId = localStorage.getItem('userId') || Date.now().toString();
+          const { data: userAction } = await supabase
+            .from('user_actions')
+            .select('action')
+            .eq('user_id', userId)
+            .eq('post_id', post.id)
+            .single();
+          post.userAction = userAction ? userAction.action : null;
+        }
 
         if (bubbleElement) {
           bubbleElement.style.display = 'none';
@@ -1318,28 +1384,32 @@
 
         // Fallback bubbles
         bubbles = [
-          { id: 1, text: 'Dream', likes: 0, x: canvas.width * 0.3, y: canvas.height * 0.3, vx: 0.5, vy: 0.5, radius: 40 },
-          { id: 2, text: 'Hope', likes: 0, x: canvas.width * 0.7, y: canvas.height * 0.7, vx: -0.5, vy: -0.5, radius: 40 }
+          { id: 'cloud-fallback-1', text: 'Dream', likes: 0, x: canvas.width * 0.3, y: canvas.height * 0.3, vx: 0.5, vy: 0.5, radius: 40 },
+          { id: 'cloud-fallback-2', text: 'Hope', likes: 0, x: canvas.width * 0.7, y: canvas.height * 0.7, vx: -0.5, vy: -0.5, radius: 40 }
         ];
 
-        const { data: posts, error } = await supabase
-          .from('posts')
-          .select('*')
-          .order('likes', { ascending: false })
-          .limit(20);
-        if (error) {
-          console.error('JoyVibe: Supabase error fetching cloud posts:', error);
-        } else if (posts && posts.length) {
-          bubbles = posts.map(post => ({
-            id: post.id,
-            text: post.text.split(' ')[0] || 'Post',
-            likes: post.likes || 0,
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            vx: (Math.random() - 0.5) * 1,
-            vy: (Math.random() - 0.5) * 1,
-            radius: 40
-          }));
+        if (supabase && supabaseInitialized) {
+          const { data: posts, error } = await supabase
+            .from('posts')
+            .select('*')
+            .order('likes', { ascending: false })
+            .limit(20);
+          if (error) {
+            console.error('JoyVibe: Supabase error fetching cloud posts:', error);
+          } else if (posts && posts.length) {
+            bubbles = posts.map(post => ({
+              id: post.id,
+              text: post.text.split(' ')[0] || 'Post',
+              likes: post.likes || 0,
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              vx: (Math.random() - 0.5) * 1,
+              vy: (Math.random() - 0.5) * 1,
+              radius: 40
+            }));
+          }
+        } else {
+          console.warn('JoyVibe: Supabase not initialized, using fallback orbs');
         }
         console.log('JoyVibe: Cloud bubbles created:', bubbles.length);
 
@@ -1349,7 +1419,7 @@
           const mouseY = e.clientY - rect.top;
           for (let b of bubbles) {
             const dist = Math.sqrt((mouseX - b.x) ** 2 + (mouseY - b.y) ** 2);
-            if (dist <= b.radius) {
+            if (dist <= b.radius && supabase && supabaseInitialized) {
               supabase
                 .from('posts')
                 .select('*')
@@ -1395,8 +1465,7 @@
           hoveredBubbleId = null;
           bubbles.forEach(b => {
             const dist = Math.sqrt((touchX - b.x) ** 2 + (touchY - b.y) ** 2);
-            if (dist <= b.radius) {
-              hoveredBubbleId = b.id;
+            if (dist <= b.radius && supabase && supabaseInitialized) {
               supabase
                 .from('posts')
                 .select('*')
@@ -1444,27 +1513,36 @@
     }
 
     // Real-Time Subscription
-    if (supabase) {
-      supabase
-        .channel('posts')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
-          console.log('JoyVibe: New post received:', payload.new.id);
-          loadRecentPosts();
-          loadFeed('newest');
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async payload => {
-          console.log('JoyVibe: Post updated:', payload.new.id);
-          const userId = localStorage.getItem('userId') || Date.now().toString();
-          const { data: userAction } = await supabase
-            .from('user_actions')
-            .select('action')
-            .eq('user_id', userId)
-            .eq('post_id', payload.new.id)
-            .single();
-          payload.new.userAction = userAction ? userAction.action : null;
-          updateBubble(payload.new);
-        })
-        .subscribe();
+    function setupRealtime() {
+      try {
+        if (!supabase || !supabaseInitialized) {
+          console.warn('JoyVibe: Supabase not initialized, skipping realtime subscription');
+          return;
+        }
+        supabase
+          .channel('posts')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
+            console.log('JoyVibe: New post received:', payload.new.id);
+            loadRecentPosts();
+            loadFeed('newest');
+          })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, async payload => {
+            console.log('JoyVibe: Post updated:', payload.new.id);
+            const userId = localStorage.getItem('userId') || Date.now().toString();
+            const { data: userAction } = await supabase
+              .from('user_actions')
+              .select('action')
+              .eq('user_id', userId)
+              .eq('post_id', payload.new.id)
+              .single();
+            payload.new.userAction = userAction ? userAction.action : null;
+            updateBubble(payload.new);
+          })
+          .subscribe();
+        console.log('JoyVibe: Realtime subscription set up');
+      } catch (err) {
+        console.error('JoyVibe: Error in setupRealtime:', err);
+      }
     }
 
     // Update Bubble
@@ -1518,6 +1596,21 @@
         console.log('JoyVibe: Initializing at', new Date().toISOString());
         const errorMessage = document.getElementById('error-message');
         if (errorMessage) errorMessage.style.display = 'none';
+
+        // Initialize Supabase
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+          supabase = supabase.createClient(
+            'https://cfyptrsiifzrnncpagxd.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
+          );
+          supabaseInitialized = true;
+          console.log('JoyVibe: Supabase initialized successfully');
+          setupRealtime();
+        } else {
+          console.error('JoyVibe: Supabase library not loaded');
+          alert('Database service unavailable. You can view content but posting is disabled.');
+        }
+
         initStars();
         loadRecentPosts();
         showSection('landing');
