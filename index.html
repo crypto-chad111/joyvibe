@@ -644,11 +644,11 @@
     </div>
   </section>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.0/dist/umd/supabase.min.js"></script>
+  <script defer src="https://unpkg.com/@supabase/supabase-js@2.47.0/dist/umd/supabase.min.js"></script>
   <script>
     // Global Error Handler
     window.onerror = function(msg, url, lineNo, columnNo, error) {
-      console.error('JoyVibe: Global error:', msg, 'Line:', lineNo, 'Column:', columnNo, 'Error:', error);
+      console.error('JoyVibe: Global error:', msg, 'Line:', lineNo, 'Column:', columnNo, 'Error:', error, 'Stack:', error?.stack);
       const errorMessage = document.getElementById('error-message');
       if (errorMessage) errorMessage.style.display = 'block';
     };
@@ -656,6 +656,26 @@
     // Initialize Supabase
     let supabase;
     let supabaseInitialized = false;
+
+    async function initializeSupabase() {
+      try {
+        console.log('JoyVibe: Attempting Supabase initialization');
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+          supabase = supabase.createClient(
+            'https://cfyptrsiifzrnncpagxd.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
+          );
+          supabaseInitialized = true;
+          console.log('JoyVibe: Supabase initialized successfully');
+          setupRealtime();
+        } else {
+          throw new Error('Supabase library not loaded');
+        }
+      } catch (err) {
+        console.error('JoyVibe: Failed to initialize Supabase:', err, 'Stack:', err.stack);
+        alert('Database service unavailable. You can view content but posting is disabled.');
+      }
+    }
 
     // State
     let cloudPaused = false;
@@ -985,9 +1005,7 @@
         let posts = [];
         if (supabase && supabaseInitialized) {
           let query = supabase.from('posts').select('*');
-          query = sort === 'liked' ? query.order('likes', { ascending: false }) : query.order('timestamp', { ascending: false });
-          const { data, error } = await query;
-          if (error) {
+  if (error) {
             console.error('JoyVibe: Supabase error fetching feed:', error);
             throw error;
           }
@@ -1591,26 +1609,13 @@
     });
 
     // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       try {
         console.log('JoyVibe: Initializing at', new Date().toISOString());
         const errorMessage = document.getElementById('error-message');
         if (errorMessage) errorMessage.style.display = 'none';
 
-        // Initialize Supabase
-        if (typeof supabase !== 'undefined' && supabase.createClient) {
-          supabase = supabase.createClient(
-            'https://cfyptrsiifzrnncpagxd.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
-          );
-          supabaseInitialized = true;
-          console.log('JoyVibe: Supabase initialized successfully');
-          setupRealtime();
-        } else {
-          console.error('JoyVibe: Supabase library not loaded');
-          alert('Database service unavailable. You can view content but posting is disabled.');
-        }
-
+        await initializeSupabase();
         initStars();
         loadRecentPosts();
         showSection('landing');
