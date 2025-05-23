@@ -567,7 +567,7 @@
 <body>
   <canvas id="stars-canvas"></canvas>
   <div id="error-message" style="display: none; color: red; text-align: center; padding: 20px;">
-    Error: JavaScript failed to load. Please check the console (F12) for details.
+    Error: Unable to connect to the database. Please try again later or contact support.
   </div>
   <nav>
     <div class="logo">JoyVibe</div>
@@ -644,7 +644,7 @@
     </div>
   </section>
 
-  <script defer src="https://unpkg.com/@supabase/supabase-js@2.47.0/dist/umd/supabase.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
     // Global Error Handler
     window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -653,18 +653,23 @@
       if (errorMessage) errorMessage.style.display = 'block';
     };
 
-    // Initialize Supabase
+    // Initialize Supabase with retry mechanism
     let supabase;
     let supabaseInitialized = false;
+    let retryCount = 0;
+    const maxRetries = 3;
 
     async function initializeSupabase() {
       try {
-        console.log('JoyVibe: Attempting Supabase initialization');
-        if (typeof supabase !== 'undefined' && supabase.createClient) {
-          supabase = supabase.createClient(
+        console.log('JoyVibe: Attempting Supabase initialization, attempt', retryCount + 1);
+        if (typeof supabaseClient !== 'undefined' && supabaseClient.createClient) {
+          supabase = supabaseClient.createClient(
             'https://cfyptrsiifzrnncpagxd.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
           );
+          // Test connection
+          const { data, error } = await supabase.from('posts').select('id').limit(1);
+          if (error) throw new Error(`Supabase connection test failed: ${error.message}`);
           supabaseInitialized = true;
           console.log('JoyVibe: Supabase initialized successfully');
           setupRealtime();
@@ -673,7 +678,17 @@
         }
       } catch (err) {
         console.error('JoyVibe: Failed to initialize Supabase:', err, 'Stack:', err.stack);
-        alert('Database service unavailable. You can view content but posting is disabled.');
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log('JoyVibe: Retrying Supabase initialization in 2 seconds...');
+          setTimeout(initializeSupabase, 2000);
+        } else {
+          const errorMessage = document.getElementById('error-message');
+          if (errorMessage) {
+            errorMessage.textContent = 'Error: Database connection failed after retries. You can view content but posting is disabled.';
+            errorMessage.style.display = 'block';
+          }
+        }
       }
     }
 
@@ -865,9 +880,9 @@
             <div class="bubble-content">
               <p>${text}</p>
               <div class="actions">
-                <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost(${post.id})`}">❤️ ${post.likes || 0}</span>
-                <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost(${post.id})`}">⬇ ${post.dislikes || 0}</span>
-                <span onclick="event.stopPropagation(); sharePost(${post.id})">📤 Share</span>
+                <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
+                <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
+                <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
               </div>
             </div>
             ${isExpanded ? '<button class="close-button">Close</button>' : ''}
@@ -1005,7 +1020,13 @@
         let posts = [];
         if (supabase && supabaseInitialized) {
           let query = supabase.from('posts').select('*');
-  if (error) {
+          if (sort === 'newest') {
+            query = query.order('timestamp', { ascending: false });
+          } else if (sort === 'liked') {
+            query = query.order('likes', { ascending: false });
+          }
+          const { data, error } = await query;
+          if (error) {
             console.error('JoyVibe: Supabase error fetching feed:', error);
             throw error;
           }
@@ -1161,7 +1182,7 @@
         }
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ likes: supabase.raw('likes + 1') })
+          .update({ likes: supabase.rpc('increment', { row_id: id, column_name: 'likes' }) })
           .eq('id', id);
         if (updateError) {
           console.error('JoyVibe: Failed to update likes:', updateError);
@@ -1197,7 +1218,7 @@
         }
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ dislikes: supabase.raw('dislikes + 1') })
+          .update({ dislikes: supabase.rpc('increment', { row_id: id, column_name: 'dislikes' }) })
           .eq('id', id);
         if (updateError) {
           console.error('JoyVibe: Failed to update dislikes:', updateError);
@@ -1212,8 +1233,10 @@
         const url = `https://joyvibe.world/?post=${id}`;
         navigator.clipboard.writeText(url).then(() => {
           console.log('JoyVibe: URL copied');
+          alert('Link copied to clipboard!');
         }).catch(err => {
           console.error('JoyVibe: Clipboard error:', err);
+          alert('Failed to copy link. Please try again.');
         });
       } catch (err) {
         console.error('JoyVibe: Error in sharePost:', err);
@@ -1575,9 +1598,9 @@
           bubble.querySelector('.bubble-content').innerHTML = `
             <p>${text}</p>
             <div class="actions">
-              <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost(${post.id})`}">❤️ ${post.likes || 0}</span>
-              <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost(${post.id})`}">⬇ ${post.dislikes || 0}</span>
-              <span onclick="event.stopPropagation(); sharePost(${post.id})">📤 Share</span>
+              <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
+              <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
+              <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
             </div>
           `;
           if (isExpanded) {
