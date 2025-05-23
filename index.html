@@ -645,6 +645,13 @@
   </section>
 
 <script defer src="/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+  if (!window.supabaseClient) {
+    console.error('JoyVibe: CDN failed, trying fallback');
+    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>');
+  }
+</script>
 <script>
   // Global Error Handler
   window.onerror = function(msg, url, lineNo, columnNo, error) {
