@@ -644,7 +644,13 @@
     </div>
   </section>
 
-  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+ <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script defer>
+  // Fallback for Supabase library
+  if (!window.supabaseClient) {
+    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>');
+  }
+</script>
 <script>
   // Global Error Handler
   window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -664,7 +670,7 @@
       console.log('JoyVibe: Attempting Supabase initialization, attempt', retryCount + 1);
       if (typeof supabaseClient !== 'undefined' && supabaseClient.createClient) {
         supabase = supabaseClient.createClient(
-          'https://cfyptrsiifzrnncpagxd.supabase.co/functions/v1/cors-proxy',
+          'https://cfyptrsiifzrnncpagxd.supabase.co/functions/v1/<function-name>',
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
         );
         // Test connection
@@ -677,7 +683,7 @@
         console.log('JoyVibe: Supabase initialized successfully, data:', data);
         setupRealtime();
       } else {
-        throw new Error('Supabase library not loaded');
+        throw new Error('Supabase library not loaded or supabaseClient undefined');
       }
     } catch (err) {
       console.error('JoyVibe: Failed to initialize Supabase:', err.message, 'Stack:', err.stack);
