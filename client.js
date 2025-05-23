@@ -1,23 +1,4 @@
-console.log('JoyVibe: Client script starting at', new Date().toLocaleString());
-
-// Supabase client
 const supabase = Supabase.createClient('https://cfyptrsiifzrnncpagxd.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI');
-const url = `https://joyvibe.world/?post=${id}`;
-supabase
-  .from('posts')
-  .on('INSERT', payload => {
-    console.log('JoyVibe: New post received:', payload.new.id);
-    loadRecentPosts();
-    loadFeed('newest');
-  })
-  .subscribe();
-// Hide error message
-const errorMessage = document.getElementById('error-message');
-if (errorMessage) {
-  errorMessage.style.display = 'none';
-} else {
-  console.error('JoyVibe: Error message div missing');
-}
 
 // State
 let cloudPaused = false;
@@ -115,60 +96,6 @@ function sanitizeText(text) {
   } catch (err) {
     console.error('JoyVibe: Error in sanitizeText:', err);
     return text;
-  }
-}
-
-// Load Recent Posts
-async function loadRecentPosts() {
-  try {
-    console.log('JoyVibe: Loading recent posts');
-    const container = document.getElementById('recent-posts');
-    if (!container) {
-      console.error('JoyVibe: recent-posts container missing');
-      return;
-    }
-    container.innerHTML = '';
-    const { data: posts } = await supabase
-      .from('posts')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(5);
-    posts.forEach(post => {
-      const bubble = createBubble(post);
-      container.appendChild(bubble);
-    });
-    console.log('JoyVibe: Recent posts loaded:', posts.length);
-    observeBubbles();
-  } catch (err) {
-    console.error('JoyVibe: Error in loadRecentPosts:', err);
-  }
-}
-
-// Load Feed
-async function loadFeed(sort) {
-  try {
-    console.log('JoyVibe: Loading feed:', sort);
-    const container = document.getElementById('feed-posts');
-    if (!container) {
-      console.error('JoyVibe: feed-posts container missing');
-      return;
-    }
-    container.innerHTML = '';
-    let query = supabase.from('posts').select('*');
-    if (sort === 'liked') {
-      query = query.order('likes', { ascending: false });
-    } else {
-      query = query.order('timestamp', { ascending: false });
-    }
-    const { data: posts } = await query;
-    posts.forEach(post => {
-      const bubble = createBubble(post);
-      container.appendChild(bubble);
-    });
-    console.log('JoyVibe: Feed loaded:', posts.length);
-    observeBubbles();
-  } catch (err) {
-    console.error('JoyVibe: Error in loadFeed:', err);
   }
 }
 
@@ -273,19 +200,8 @@ function createBubble(post, isCloud = false) {
           const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
           if (!isAction && !isCloud && !bubble.classList.contains('expanded')) {
             const postId = bubble.dataset.postId;
-            supabase
-              .from('posts')
-              .select('*')
-              .eq('id', postId)
-              .single()
-              .then(({ data: post }) => {
-                console.log('JoyVibe: Bubble clicked, post:', postId);
-                if (post) {
-                  showExpandedBubble(post, bubble.parentElement.id, bubble);
-                } else {
-                  console.error('JoyVibe: Post not found for ID:', postId);
-                }
-              });
+            console.log('JoyVibe: Bubble clicked, post:', postId);
+            showExpandedBubble(post, bubble.parentElement.id, bubble);
             e.stopPropagation();
           } else {
             console.log('JoyVibe: Clicked on action, expanded bubble, or cloud bubble, skipping expansion');
@@ -299,6 +215,70 @@ function createBubble(post, isCloud = false) {
   } catch (err) {
     console.error('JoyVibe: Error in createBubble:', err);
     return document.createElement('div');
+  }
+}
+
+// Load Recent Posts
+async function loadRecentPosts() {
+  try {
+    console.log('JoyVibe: Loading recent posts');
+    const container = document.getElementById('recent-posts');
+    if (!container) {
+      console.error('JoyVibe: recent-posts container missing');
+      return;
+    }
+    container.innerHTML = '';
+    const { data: posts } = await supabase
+      .from('posts')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(5);
+    if (posts) {
+      posts.forEach(post => {
+        const bubble = createBubble(post);
+        container.appendChild(bubble);
+      });
+      console.log('JoyVibe: Recent posts loaded:', posts.length);
+      observeBubbles();
+    } else {
+      console.log('JoyVibe: No posts found');
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in loadRecentPosts:', err);
+  }
+}
+
+// Load Feed
+async function loadFeed(sort) {
+  try {
+    console.log('JoyVibe: Loading feed:', sort);
+    const container = document.getElementById('feed-posts');
+    if (!container) {
+      console.error('JoyVibe: feed-posts container missing');
+      return;
+    }
+    container.innerHTML = '';
+    let query = supabase
+      .from('posts')
+      .select('*');
+    if (sort === 'liked') {
+      query = query.order('likes', { ascending: false });
+    } else {
+      query = query.order('timestamp', { ascending: false });
+    }
+    const { data: posts } = await query;
+    if (posts) {
+      posts.forEach(post => {
+        const bubble = createBubble(post);
+        container.appendChild(bubble);
+      });
+      console.log('JoyVibe: Feed loaded:', posts.length);
+      observeBubbles();
+    } else {
+      console.log('JoyVibe: No posts found');
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in loadFeed:', err);
   }
 }
 
@@ -388,32 +368,31 @@ async function likePost(id) {
     console.log('JoyVibe: Attempting to like post:', id);
     const userId = localStorage.getItem('userId') || Date.now().toString();
     localStorage.setItem('userId', userId);
-
-    const { data: existingAction } = await supabase
+    const { data: existing } = await supabase
       .from('user_actions')
       .select('action')
       .eq('user_id', userId)
-      .eq('post_id', id);
-    if (existingAction.length > 0) {
-      console.log('JoyVibe: User already acted on post', id, ':', existingAction[0].action);
+      .eq('post_id', id)
+      .single();
+    if (existing) {
+      console.log('JoyVibe: User already acted on post', id, ':', existing.action);
       return;
     }
-
-    const { error: actionError } = await supabase
+    const { error: insertError } = await supabase
       .from('user_actions')
       .insert([{ user_id: userId, post_id: id, action: 'liked' }]);
-    if (actionError) {
-      console.error('JoyVibe: Failed to record like action:', actionError);
+    if (insertError) {
+      console.error('JoyVibe: Failed to record like:', insertError);
       return;
     }
-
     const { error: updateError } = await supabase
       .from('posts')
       .update({ likes: supabase.raw('likes + 1') })
       .eq('id', id);
     if (updateError) {
-      console.error('JoyVibe: Failed to like post:', updateError);
+      console.error('JoyVibe: Failed to update likes:', updateError);
     }
+    console.log('JoyVibe: Liked post', id);
   } catch (err) {
     console.error('JoyVibe: Error in likePost:', err);
   }
@@ -424,32 +403,31 @@ async function dislikePost(id) {
     console.log('JoyVibe: Attempting to dislike post:', id);
     const userId = localStorage.getItem('userId') || Date.now().toString();
     localStorage.setItem('userId', userId);
-
-    const { data: existingAction } = await supabase
+    const { data: existing } = await supabase
       .from('user_actions')
       .select('action')
       .eq('user_id', userId)
-      .eq('post_id', id);
-    if (existingAction.length > 0) {
-      console.log('JoyVibe: User already acted on post', id, ':', existingAction[0].action);
+      .eq('post_id', id)
+      .single();
+    if (existing) {
+      console.log('JoyVibe: User already acted on post', id, ':', existing.action);
       return;
     }
-
-    const { error: actionError } = await supabase
+    const { error: insertError } = await supabase
       .from('user_actions')
       .insert([{ user_id: userId, post_id: id, action: 'disliked' }]);
-    if (actionError) {
-      console.error('JoyVibe: Failed to record dislike action:', actionError);
+    if (insertError) {
+      console.error('JoyVibe: Failed to record dislike:', insertError);
       return;
     }
-
     const { error: updateError } = await supabase
       .from('posts')
       .update({ dislikes: supabase.raw('dislikes + 1') })
       .eq('id', id);
     if (updateError) {
-      console.error('JoyVibe: Failed to dislike post:', updateError);
+      console.error('JoyVibe: Failed to update dislikes:', updateError);
     }
+    console.log('JoyVibe: Disliked post', id);
   } catch (err) {
     console.error('JoyVibe: Error in dislikePost:', err);
   }
@@ -458,7 +436,7 @@ async function dislikePost(id) {
 function sharePost(id) {
   try {
     console.log('JoyVibe: Sharing post:', id);
-    const url = `https://yourdomain.com/?post=${id}`;
+    const url = `https://joyvibe.world/?post=${id}`;
     console.log('JoyVibe: Generated URL:', url);
     navigator.clipboard.writeText(url).then(() => {
       console.log('JoyVibe: URL copied');
@@ -471,13 +449,22 @@ function sharePost(id) {
 }
 
 // Expanded Bubble Functions
-function showExpandedBubble(post, containerId, bubbleElement) {
+async function showExpandedBubble(post, containerId, bubbleElement) {
   try {
     console.log('JoyVibe: Showing expanded bubble for post:', post.id, 'in container:', containerId);
     closeAllExpandedBubbles();
     expandedBubbleId = post.id;
     originalContainerId = containerId;
     originalBubble = bubbleElement;
+
+    const userId = localStorage.getItem('userId') || Date.now().toString();
+    const { data: userAction } = await supabase
+      .from('user_actions')
+      .select('action')
+      .eq('user_id', userId)
+      .eq('post_id', post.id)
+      .single();
+    post.userAction = userAction ? userAction.action : null;
 
     if (bubbleElement) {
       bubbleElement.style.display = 'none';
@@ -705,17 +692,22 @@ async function initCloud() {
       .select('*')
       .order('likes', { ascending: false })
       .limit(20);
-    bubbles = posts.map(post => ({
-      id: post.id,
-      text: post.text.split(' ')[0],
-      likes: post.likes || 0,
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 1,
-      vy: (Math.random() - 0.5) * 1,
-      radius: 40
-    }));
-    console.log('JoyVibe: Cloud bubbles created:', bubbles.length);
+    if (posts) {
+      bubbles = posts.map(post => ({
+        id: post.id,
+        text: post.text.split(' ')[0],
+        likes: post.likes || 0,
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 1,
+        vy: (Math.random() - 0.5) * 1,
+        radius: 40
+      }));
+      console.log('JoyVibe: Cloud bubbles created:', bubbles.length);
+    } else {
+      console.log('JoyVibe: No posts for cloud');
+      bubbles = [];
+    }
 
     canvas.onclick = e => {
       try {
@@ -776,135 +768,4 @@ async function initCloud() {
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
-        const touchX = touch.clientX - rect.left;
-        const touchY = touch.clientY - rect.top;
-        hoveredBubbleId = null;
-        bubbles.forEach(b => {
-          const dist = Math.sqrt((touchX - b.x) ** 2 + (touchY - b.y) ** 2);
-          if (dist <= b.radius) {
-            hoveredBubbleId = b.id;
-            console.log('JoyVibe: Touching bubble', b.id);
-            supabase
-              .from('posts')
-              .select('*')
-              .eq('id', b.id)
-              .single()
-              .then(({ data: post }) => {
-                if (post) {
-                  showExpandedBubble(post, 'cloud-canvas', null);
-                }
-              });
-          }
-        });
-      } catch (err) {
-        console.error('JoyVibe: Error in canvas ontouchstart:', err);
-      }
-    };
-    canvas.ontouchend = () => {
-      hoveredBubbleId = null;
-      console.log('JoyVibe: Touch ended');
-    };
-
-    console.log('JoyVibe: Starting canvas animation');
-    if (!cloudPaused) requestAnimationFrame(animate);
-  } catch (err) {
-    console.error('JoyVibe: Error in initCloud:', err);
-  }
-}
-
-// Cloud Controls
-function toggleCloudPause() {
-  try {
-    console.log('JoyVibe: Toggling cloud pause');
-    cloudPaused = !cloudPaused;
-    console.log('JoyVibe: cloudPaused set to:', cloudPaused);
-    if (!cloudPaused) requestAnimationFrame(animate);
-  } catch (err) {
-    console.error('JoyVibe: Error in toggleCloudPause:', err);
-  }
-}
-
-function zoomCloud(factor) {
-  try {
-    console.log('JoyVibe: Zooming cloud:', factor);
-    cloudZoom *= factor;
-  } catch (err) {
-    console.error('JoyVibe: Error in zoomCloud:', err);
-  }
-}
-
-// Handle Outside Clicks
-document.addEventListener('click', e => {
-  try {
-    const bubble = e.target.closest('.bubble.expanded');
-    const canvas = e.target.closest('#cloud-canvas');
-    const controls = e.target.closest('.cloud-controls');
-    const nav = e.target.closest('nav');
-    const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
-    if (!bubble && !canvas && !controls && !nav && !isAction && expandedBubbleId) {
-      console.log('JoyVibe: Clicked outside expanded bubble');
-      closeAllExpandedBubbles();
-    } else {
-      console.log('JoyVibe: Click within bubble, canvas, controls, nav, or action, not closing');
-    }
-  } catch (err) {
-    console.error('JoyVibe: Error in document click:', err);
-  }
-});
-
-// Real-Time Subscriptions
-supabase
-  .from('posts')
-  .on('INSERT', payload => {
-    console.log('JoyVibe: New post received:', payload.new.id);
-    loadRecentPosts();
-    loadFeed('newest');
-  })
-  .on('UPDATE', async payload => {
-    console.log('JoyVibe: Post updated:', payload.new.id);
-    const userId = localStorage.getItem('userId') || Date.now().toString();
-    const { data: userAction } = await supabase
-      .from('user_actions')
-      .select('action')
-      .eq('user_id', userId)
-      .eq('post_id', payload.new.id)
-      .single();
-    payload.new.userAction = userAction ? userAction.action : null;
-    updateBubble(payload.new);
-  })
-  .subscribe();
-
-// Update Bubble for Real-Time Changes
-function updateBubble(post) {
-  const bubbles = document.querySelectorAll(`.bubble[data-post-id="${post.id}"]`);
-  bubbles.forEach(bubble => {
-    const isExpanded = bubble.classList.contains('expanded');
-    const textElement = bubble.querySelector('p');
-    const actions = bubble.querySelector('.actions');
-    if (textElement && actions) {
-      const text = isExpanded ? sanitizeText(post.text) : 
-        post.text.split(' ').slice(0, 5).join(' ').slice(0, 27) + (post.text.length > 30 ? '...' : '');
-      textElement.innerHTML = text;
-      const isLiked = post.userAction === 'liked';
-      const isDisliked = post.userAction === 'disliked';
-      actions.innerHTML = `
-        <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost(${post.id})`}">❤️ ${post.likes || 0}</span>
-        <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost(${post.id})`}">⬇ ${post.dislikes || 0}</span>
-        <span onclick="event.stopPropagation(); sharePost(${post.id})">📤 Share</span>
-      `;
-    }
-  });
-}
-
-// Initialize
-try {
-  console.log('JoyVibe: Initializing');
-  initStars();
-  loadRecentPosts();
-  showSection('landing');
-} catch (err) {
-  console.error('JoyVibe: Initialization error:', err);
-  if (errorMessage) {
-    errorMessage.style.display = 'block';
-  }
-}
+        const touchX = touch.clientX -
