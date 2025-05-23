@@ -644,13 +644,7 @@
     </div>
   </section>
 
- <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script defer>
-  // Fallback for Supabase library
-  if (!window.supabaseClient) {
-    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>');
-  }
-</script>
+<script defer src="supabase.min.js"></script>
 <script>
   // Global Error Handler
   window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -670,7 +664,7 @@
       console.log('JoyVibe: Attempting Supabase initialization, attempt', retryCount + 1);
       if (typeof supabaseClient !== 'undefined' && supabaseClient.createClient) {
         supabase = supabaseClient.createClient(
-          'https://cfyptrsiifzrnncpagxd.supabase.co/functions/v1/<function-name>',
+          'https://cfyptrsiifzrnncpagxd.supabase.co/functions/v1/cors-proxy',
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
         );
         // Test connection
@@ -891,8 +885,8 @@
           <div class="bubble-content">
             <p>${text}</p>
             <div class="actions">
-              <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
-              <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
+              <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`} " > ❤️ ${post.likes || 0} </span>
+              <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`} " > ⬇ ${post.dislikes || 0} </span>
               <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
             </div>
           </div>
@@ -1574,7 +1568,7 @@
       supabase
         .channel('posts')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
-          console.log('JoyVibe: New post received:', payload.new.id);
+          console.log('JoyVibe: New post received сына:', payload.new.id);
           loadRecentPosts();
           loadFeed('newest');
         })
