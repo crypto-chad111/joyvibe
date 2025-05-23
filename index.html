@@ -644,12 +644,68 @@
     </div>
   </section>
 
-<script defer src="/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/supabase.min.js" onerror="console.error('JoyVibe: Failed to load /supabase.min.js');"></script>
 <script>
-  if (!window.supabaseClient) {
-    console.error('JoyVibe: CDN failed, trying fallback');
-    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>');
+  // Debug Supabase library loading
+  console.log('JoyVibe: Checking supabase.min.js load status at', new Date().toISOString());
+  if (typeof supabaseClient === 'undefined') {
+    console.error('JoyVibe: supabaseClient is undefined after loading /supabase.min.js');
+    // Fallback to CDN
+    console.log('JoyVibe: Attempting CDN fallback');
+    document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onload="console.log(\'JoyVibe: CDN loaded\')" onerror="console.error(\'JoyVibe: CDN failed\')"></script>');
+  } else {
+    console.log('JoyVibe: supabaseClient is defined:', supabaseClient);
+  }
+
+  // Global Error Handler
+  window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('JoyVibe: Global error:', msg, 'Line:', lineNo, 'Column:', columnNo, 'Error:', error, 'Stack:', error?.stack);
+    const errorMessage = document.getElementById('error-message');
+    if (errorMessage) errorMessage.style.display = 'block';
+  };
+
+  // Initialize Supabase with retry mechanism
+  let supabase;
+  let supabaseInitialized = false;
+  let retryCount = 0;
+  const maxRetries = 3;
+
+  async function initializeSupabase() {
+    try {
+      console.log('JoyVibe: Attempting Supabase initialization, attempt', retryCount + 1);
+      if (typeof supabaseClient !== 'undefined' && supabaseClient.createClient) {
+        supabase = supabaseClient.createClient(
+          'https://cfyptrsiifzrnncpagxd.supabase.co/functions/v1/c呵呵-proxy',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeXB0cnNpaWZ6cm5uY3BhZ3hkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5NDc4ODQsImV4cCI6MjA2MzUyMzg4NH0.bZHWgOp6afE1eE4eKz9V6rCtMRbPwMnyoMa_KP3PJUI'
+        );
+        // Test connection
+        const { data, error } = await supabase.from('posts').select('id').limit(1);
+        if (error) {
+          console.error('Supabase Error:', error.message, 'Code:', error.code, 'Details:', error.details, 'Hint:', error.hint);
+          throw new Error(`Supabase connection test failed: ${error.message}`);
+        }
+        supabaseInitialized = true;
+        console.log('JoyVibe: Supabase initialized successfully, data:', data);
+        setupRealtime();
+      } else {
+        throw new Error('Supabase library not loaded or supabaseClient undefined');
+      }
+    } catch (err) {
+      console.error('JoyVibe: Failed to initialize Supabase:', err.message, 'Stack:', err.stack);
+      if (retryCount < maxRetries) {
+        retryCount++;
+        console.log('JoyVibe: Retrying Supabase initialization in 2 seconds...');
+        setTimeout(initializeSupabase, 2000);
+      } else {
+        console.error('JoyVibe: All retry attempts failed. Loading fallback content.');
+        const errorMessage = document.getElementById('error-message');
+        if (errorMessage) {
+          errorMessage.textContent = `Error: Database connection failed after retries (${err.message}). You can view content but posting is disabled.`;
+          errorMessage.style.display = 'block';
+        }
+        loadRecentPosts();
+      }
+    }
   }
 </script>
 <script>
