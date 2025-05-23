@@ -768,4 +768,145 @@ async function initCloud() {
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
-        const touchX = touch.clientX -
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+        hoveredBubbleId = null;
+        bubbles.forEach(b => {
+          const dist = Math.sqrt((touchX - b.x) ** 2 + (touchY - b.y) ** 2);
+          if (dist <= b.radius) {
+            hoveredBubbleId = b.id;
+            console.log('JoyVibe: Touching bubble', b.id);
+            const post = posts.find(p => p.id === b.id);
+            if (post) {
+              showExpandedBubble(post, 'cloud-canvas', null);
+            }
+          }
+        });
+      } catch (err) {
+        console.error('JoyVibe: Error in canvas ontouchstart:', err);
+      }
+    };
+    canvas.ontouchend = () => {
+      hoveredBubbleId = null;
+      console.log('JoyVibe: Touch ended');
+    };
+
+    console.log('JoyVibe: Starting canvas animation');
+    if (!cloudPaused) requestAnimationFrame(animate);
+  } catch (err) {
+    console.error('JoyVibe: Error in initCloud:', err);
+  }
+}
+
+// Cloud Controls
+function toggleCloudPause() {
+  try {
+    console.log('JoyVibe: Toggling cloud pause');
+    cloudPaused = !cloudPaused;
+    console.log('JoyVibe: cloudPaused set to:', cloudPaused);
+    if (!cloudPaused) requestAnimationFrame(animate);
+  } catch (err) {
+    console.error('JoyVibe: Error in toggleCloudPause:', err);
+  }
+}
+
+function zoomCloud(factor) {
+  try {
+    console.log('JoyVibe: Zooming cloud:', factor);
+    cloudZoom *= factor;
+  } catch (err) {
+    console.error('JoyVibe: Error in zoomCloud:', err);
+  }
+}
+
+// Real-Time Subscription
+supabase
+  .from('posts')
+  .on('INSERT', payload => {
+    console.log('JoyVibe: New post received:', payload.new.id);
+    loadRecentPosts();
+    loadFeed('newest');
+  })
+  .on('UPDATE', async payload => {
+    console.log('JoyVibe: Post updated:', payload.new.id);
+    const userId = localStorage.getItem('userId') || Date.now().toString();
+    const { data: userAction } = await supabase
+      .from('user_actions')
+      .select('action')
+      .eq('user_id', userId)
+      .eq('post_id', payload.new.id)
+      .single();
+    payload.new.userAction = userAction ? userAction.action : null;
+    updateBubble(payload.new);
+  })
+  .subscribe();
+
+async function updateBubble(post) {
+  try {
+    console.log('JoyVibe: Updating bubble for post:', post.id);
+    const bubbles = document.querySelectorAll(`.bubble[data-post-id="${post.id}"]`);
+    bubbles.forEach(bubble => {
+      const isExpanded = bubble.classList.contains('expanded');
+      const isLiked = post.userAction === 'liked';
+      const isDisliked = post.userAction === 'disliked';
+      const text = isExpanded ? sanitizeText(post.text) : sanitizeText(post.text.split(' ').slice(0, 5).join(' ')) + (post.text.length > 30 ? '...' : '');
+      bubble.querySelector('.bubble-content').innerHTML = `
+        <p>${text}</p>
+        <div class="actions">
+          <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost(${post.id})`}">❤️ ${post.likes || 0}</span>
+          <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost(${post.id})`}">⬇ ${post.dislikes || 0}</span>
+          <span onclick="event.stopPropagation(); sharePost(${post.id})">📤 Share</span>
+        </div>
+      `;
+      if (isExpanded) {
+        const closeButton = document.createElement('button');
+        closeButton.className = 'close-button';
+        closeButton.textContent = 'Close';
+        closeButton.addEventListener('click', e => {
+          e.stopPropagation();
+          closeAllExpandedBubbles();
+        });
+        bubble.appendChild(closeButton);
+      }
+    });
+  } catch (err) {
+    console.error('JoyVibe: Error in updateBubble:', err);
+  }
+}
+
+// Handle Outside Clicks
+document.addEventListener('click', e => {
+  try {
+    const bubble = e.target.closest('.bubble.expanded');
+    const canvas = e.target.closest('#cloud-canvas');
+    const controls = e.target.closest('.cloud-controls');
+    const nav = e.target.closest('nav');
+    const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
+    if (!bubble && !canvas && !controls && !nav && !isAction && expandedBubbleId) {
+      console.log('JoyVibe: Clicked outside expanded bubble');
+      closeAllExpandedBubbles();
+    } else {
+      console.log('JoyVibe: Click within bubble, canvas, controls, nav, or action, not closing');
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in document click:', err);
+  }
+});
+
+// Initialize
+try {
+  console.log('JoyVibe: Initializing');
+  const errorMessage = document.getElementById('error-message');
+  if (errorMessage) {
+    errorMessage.style.display = 'none';
+  }
+  initStars();
+  loadRecentPosts();
+  showSection('landing');
+} catch (err) {
+  console.error('JoyVibe: Initialization error:', err);
+  const errorMessage = document.getElementById('error-message');
+  if (errorMessage) {
+    errorMessage.style.display = 'block';
+  }
+}
