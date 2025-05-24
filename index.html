@@ -659,22 +659,35 @@
       appId: "1:920959691579:web:be079e785dd4ce5a5fe51e"
     };
 
-    // Initialize Firebase
+    // Initialize Firebase with Retry
     let db, postsCollection;
-    try {
-      console.log('JoyVibe: Attempting Firebase initialization');
-      const app = firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore();
-      postsCollection = db.collection('posts');
-      firebase.auth().signInAnonymously().catch(err => {
-        console.error('JoyVibe: Anonymous auth error:', err);
-        showError('Failed to authenticate with Firebase.');
-      });
-      console.log('JoyVibe: Firebase initialized successfully');
-    } catch (err) {
-      console.error('JoyVibe: Firebase initialization failed:', err);
-      showError('Unable to connect to Firebase. Using offline mode.');
-      setupOfflineFallback();
+    let firebaseInitialized = false;
+    let authRetryCount = 0;
+    const maxAuthRetries = 3;
+
+    async function initializeFirebase() {
+      try {
+        console.log('JoyVibe: Attempting Firebase initialization, attempt', authRetryCount + 1);
+        const app = firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        postsCollection = db.collection('posts');
+        await firebase.auth().signInAnonymously();
+        firebaseInitialized = true;
+        console.log('JoyVibe: Firebase initialized successfully');
+        syncLocalPosts();
+        setupRealtime();
+      } catch (err) {
+        console.error('JoyVibe: Firebase initialization failed:', err);
+        if (authRetryCount < maxAuthRetries) {
+          authRetryCount++;
+          console.log('JoyVibe: Retrying Firebase initialization in 2 seconds...');
+          setTimeout(initializeFirebase, 2000);
+        } else {
+          console.error('JoyVibe: All Firebase initialization attempts failed');
+          showError('Unable to connect to Firebase. Using offline mode.');
+          setupOfflineFallback();
+        }
+      }
     }
 
     // Global Error Handler
@@ -737,6 +750,33 @@
         })
       };
       postsCollection = db.collection('posts');
+    }
+
+    // Sync Local Posts to Firestore
+    async function syncLocalPosts() {
+      if (!firebaseInitialized) return;
+      try {
+        console.log('JoyVibe: Attempting to sync local posts');
+        const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+        if (localPosts.length === 0) {
+          console.log('JoyVibe: No local posts to sync');
+          return;
+        }
+        for (const post of localPosts) {
+          const docRef = await postsCollection.add({
+            text: post.text,
+            likes: post.likes || 0,
+            dislikes: post.dislikes || 0,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          console.log('JoyVibe: Synced local post to Firestore, new ID:', docRef.id);
+        }
+        localStorage.setItem('pendingPosts', '[]');
+        console.log('JoyVibe: Local posts synced, cleared pendingPosts');
+        loadRecentPosts();
+      } catch (err) {
+        console.error('JoyVibe: Error syncing local posts:', err);
+      }
     }
 
     // State
@@ -937,8 +977,8 @@
             <div class="bubble-content">
               <p>${text}</p>
               <div class="actions">
-                <span class="${isLiked || post.id.startsWith('local-') ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked || post.id.startsWith('local-') ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
-                <span class="${isDisliked || post.id.startsWith('local-') ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked || post.id.startsWith('local-') ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
+                <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
+                <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
                 <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
               </div>
             </div>
@@ -1013,7 +1053,7 @@
         container.innerHTML = '<p>Loading...</p>';
 
         let posts = [];
-        if (db && postsCollection) {
+        if (firebaseInitialized && db && postsCollection) {
           try {
             const snapshot = await postsCollection.orderBy('timestamp', 'desc').limit(5).get();
             posts = snapshot.docs.map(doc => ({
@@ -1026,12 +1066,10 @@
             console.error('JoyVibe: Firebase fetch error:', err);
             throw err;
           }
-          const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-          posts = [...localPosts, ...posts];
-        } else {
-          console.warn('JoyVibe: Firebase not initialized, using local posts');
-          posts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
         }
+
+        const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+        posts = [...localPosts, ...posts];
 
         container.innerHTML = '';
         if (posts.length === 0) {
@@ -1084,7 +1122,7 @@
         container.innerHTML = '<p>Loading...</p>';
 
         let posts = [];
-        if (db && postsCollection) {
+        if (firebaseInitialized && db && postsCollection) {
           let query = postsCollection;
           if (sort === 'newest') {
             query = query.orderBy('timestamp', 'desc');
@@ -1098,12 +1136,10 @@
             timestamp: doc.data().timestamp?.toDate() || new Date()
           }));
           console.log('JoyVibe: Fetched feed posts:', posts.length);
-          const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-          posts = [...localPosts, ...posts];
-        } else {
-          console.warn('JoyVibe: Firebase not initialized, using local posts');
-          posts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
         }
+
+        const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+        posts = [...localPosts, ...posts];
 
         container.innerHTML = '';
         if (posts.length === 0) {
@@ -1189,7 +1225,7 @@
         const result = await submitPost(text);
         textArea.value = '';
         if (result && result.id.startsWith('local-')) {
-          alert('Post saved offline and will sync later.');
+          alert('Post saved offline and will sync when online.');
         } else {
           alert('Post submitted successfully!');
         }
@@ -1204,7 +1240,7 @@
     async function submitPost(text) {
       try {
         console.log('JoyVibe: Submitting post:', text);
-        if (!db || !postsCollection) {
+        if (!firebaseInitialized || !db || !postsCollection) {
           console.error('JoyVibe: Firebase not initialized in submitPost');
           throw new Error('Database service not initialized');
         }
@@ -1212,7 +1248,7 @@
           text: sanitizeText(text),
           likes: 0,
           dislikes: 0,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp() || new Date()
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
         const docRef = await postsCollection.add(post);
         updatePostTime();
@@ -1238,7 +1274,7 @@
     // Like/Dislike/Share
     async function likePost(id) {
       try {
-        if (id.startsWith('local-') || !db || !postsCollection) {
+        if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
           console.error('JoyVibe: Local post or Firebase not initialized for likePost');
           return;
         }
@@ -1250,7 +1286,7 @@
           console.log('JoyVibe: User already acted on post:', id);
           return;
         }
-        await userActionRef.set({ action: 'liked' });
+        await userActionRef.set({ action: 'liked', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
         await postsCollection.doc(id).update({
           likes: firebase.firestore.FieldValue.increment(1)
         });
@@ -1262,7 +1298,7 @@
 
     async function dislikePost(id) {
       try {
-        if (id.startsWith('local-') || !db || !postsCollection) {
+        if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
           console.error('JoyVibe: Local post or Firebase not initialized for dislikePost');
           return;
         }
@@ -1274,7 +1310,7 @@
           console.log('JoyVibe: User already acted on post:', id);
           return;
         }
-        await userActionRef.set({ action: 'disliked' });
+        await userActionRef.set({ action: 'disliked', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
         await postsCollection.doc(id).update({
           dislikes: firebase.firestore.FieldValue.increment(1)
         });
@@ -1308,7 +1344,7 @@
         originalContainerId = containerId;
         originalBubble = bubbleElement;
 
-        if (!post.id.startsWith('local-') && db && postsCollection) {
+        if (!post.id.startsWith('local-') && firebaseInitialized && db && postsCollection) {
           const userId = localStorage.getItem('userId') || Date.now().toString();
           const userActionDoc = await postsCollection.doc(post.id).collection('user_actions').doc(userId).get();
           post.userAction = userActionDoc.exists ? userActionDoc.data().action : null;
@@ -1481,7 +1517,7 @@
           { id: 'cloud-fallback-2', text: 'Hope', likes: 0, x: canvas.width * 0.7, y: canvas.height * 0.7, vx: -0.5, vy: -0.5, radius: 40 }
         ];
 
-        if (db && postsCollection) {
+        if (firebaseInitialized && db && postsCollection) {
           const snapshot = await postsCollection.orderBy('likes', 'desc').limit(20).get();
           if (!snapshot.empty) {
             const cloudPosts = snapshot.docs.map(doc => {
@@ -1500,35 +1536,21 @@
             bubbles = [...cloudPosts];
           }
           console.log('JoyVibe: Fetched cloud posts:', snapshot.docs.length);
-          const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-          localPosts.forEach(post => {
-            bubbles.push({
-              id: post.id,
-              text: post.text.split(' ')[0] || 'Post',
-              likes: post.likes || 0,
-              x: Math.random() * canvas.width,
-              y: Math.random() * canvas.height,
-              vx: (Math.random() - 0.5) * 1,
-              vy: (Math.random() - 0.5) * 1,
-              radius: 40
-            });
-          });
-        } else {
-          console.warn('JoyVibe: Firebase not initialized, using local posts');
-          const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-          localPosts.forEach(post => {
-            bubbles.push({
-              id: post.id,
-              text: post.text.split(' ')[0] || 'Post',
-              likes: post.likes || 0,
-              x: Math.random() * canvas.width,
-              y: Math.random() * canvas.height,
-              vx: (Math.random() - 0.5) * 1,
-              vy: (Math.random() - 0.5) * 1,
-              radius: 40
-            });
-          });
         }
+
+        const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+        localPosts.forEach(post => {
+          bubbles.push({
+            id: post.id,
+            text: post.text.split(' ')[0] || 'Post',
+            likes: post.likes || 0,
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 1,
+            vy: (Math.random() - 0.5) * 1,
+            radius: 40
+          });
+        });
         console.log('JoyVibe: Cloud bubbles created:', bubbles.length);
 
         canvas.onclick = e => {
@@ -1548,7 +1570,7 @@
                   timestamp: new Date()
                 };
                 showExpandedBubble(post, 'cloud-canvas', null);
-              } else if (db && postsCollection) {
+              } else if (firebaseInitialized && db && postsCollection) {
                 postsCollection.doc(b.id).get().then(doc => {
                   if (doc.exists) {
                     showExpandedBubble({ id: doc.id, ...doc.data(), timestamp: doc.data().timestamp?.toDate() || new Date() }, 'cloud-canvas', null);
@@ -1597,7 +1619,7 @@
                   timestamp: new Date()
                 };
                 showExpandedBubble(post, 'cloud-canvas', null);
-              } else if (db && postsCollection) {
+              } else if (firebaseInitialized && db && postsCollection) {
                 postsCollection.doc(b.id).get().then(doc => {
                   if (doc.exists) {
                     showExpandedBubble({ id: doc.id, ...doc.data(), timestamp: doc.data().timestamp?.toDate() || new Date() }, 'cloud-canvas', null);
@@ -1648,16 +1670,18 @@
     // Real-Time Subscription
     function setupRealtime() {
       try {
-        if (!db || !postsCollection) {
+        if (!firebaseInitialized || !db || !postsCollection) {
           console.warn('JoyVibe: Firebase not initialized, skipping realtime subscription');
           return;
         }
         console.log('JoyVibe: Setting up real-time subscription');
+        // Listen for new posts
         postsCollection.orderBy('timestamp', 'desc').limit(5).onSnapshot(snapshot => {
           console.log('JoyVibe: Real-time update for recent posts');
           loadRecentPosts();
         });
-        postsCollection.orderBy('likes', 'desc').onSnapshot(snapshot => {
+        // Listen for post updates (likes/dislikes)
+        postsCollection.onSnapshot(snapshot => {
           snapshot.docChanges().forEach(change => {
             if (change.type === 'modified') {
               const post = {
@@ -1665,6 +1689,7 @@
                 ...change.doc.data(),
                 timestamp: change.doc.data().timestamp?.toDate() || new Date()
               };
+              console.log('JoyVibe: Post updated:', post.id);
               updateBubble(post);
             }
           });
@@ -1688,8 +1713,8 @@
           bubble.querySelector('.bubble-content').innerHTML = `
             <p>${text}</p>
             <div class="actions">
-              <span class="${isLiked || post.id.startsWith('local-') ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked || post.id.startsWith('local-') ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
-              <span class="${isDisliked || post.id.startsWith('local-') ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked || post.id.startsWith('local-') ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
+              <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
+              <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">⬇ ${post.dislikes || 0}</span>
               <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
             </div>
           `;
@@ -1731,8 +1756,8 @@
 
         console.log('JoyVibe: Starting initialization steps');
         initStars();
+        await initializeFirebase();
         await loadRecentPosts();
-        setupRealtime();
         showSection('landing');
         console.log('JoyVibe: Initialization complete');
       } catch (err) {
