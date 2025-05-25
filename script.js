@@ -105,12 +105,15 @@ function setupOfflineFallback() {
 async function syncLocalPosts() {
   if (!firebaseInitialized) return;
   try {
-    console.log('JoyVibe: Attempting to sync local posts');
+    console.log('JoyVibe: Attempting to sync local posts and actions');
     const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-    if (localPosts.length === 0) {
-      console.log('JoyVibe: No local posts to sync');
+    const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
+    if (localPosts.length === 0 && Object.keys(localActions).length === 0) {
+      console.log('JoyVibe: No local posts or actions to sync');
       return;
     }
+
+    // Sync posts
     for (const post of localPosts) {
       const docRef = await postsCollection.add({
         text: post.text,
@@ -119,9 +122,22 @@ async function syncLocalPosts() {
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
       console.log('JoyVibe: Synced local post to Firestore, new ID:', docRef.id);
+      // Sync associated actions
+      if (localActions[post.id]) {
+        const userId = localActions[post.id].userId;
+        const action = localActions[post.id].action;
+        await postsCollection.doc(docRef.id).collection('user_actions').doc(userId).set({
+          action,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('JoyVibe: Synced local action for post:', docRef.id);
+        delete localActions[post.id];
+      }
     }
+
     localStorage.setItem('pendingPosts', '[]');
-    console.log('JoyVibe: Local posts synced, cleared pendingPosts');
+    localStorage.setItem('pendingActions', JSON.stringify(localActions));
+    console.log('JoyVibe: Local posts and actions synced, cleared pending');
     loadRecentPosts();
   } catch (err) {
     console.error('JoyVibe: Error syncing local posts:', err);
@@ -626,12 +642,28 @@ async function submitPost(text) {
 // Like/Dislike/Share
 async function likePost(id) {
   try {
-    if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
-      console.error('JoyVibe: Local post or Firebase not initialized for likePost');
-      return;
-    }
     const userId = localStorage.getItem('userId') || Date.now().toString();
     localStorage.setItem('userId', userId);
+
+    if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
+      console.log('JoyVibe: Storing like locally for post:', id);
+      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+      const post = localPosts.find(p => p.id === id);
+      if (post) {
+        // Check if user already liked locally
+        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
+        if (!localActions[id]) {
+          post.likes = (post.likes || 0) + 1;
+          localActions[id] = { userId, action: 'liked' };
+          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+          localStorage.setItem('pendingActions', JSON.stringify(localActions));
+          console.log('JoyVibe: Locally liked post:', id);
+          updateBubble({ id, ...post, userAction: 'liked' });
+        }
+      }
+      return;
+    }
+
     const userActionRef = postsCollection.doc(id).collection('user_actions').doc(userId);
     const existing = await userActionRef.get();
     if (existing.exists) {
@@ -650,12 +682,28 @@ async function likePost(id) {
 
 async function dislikePost(id) {
   try {
-    if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
-      console.error('JoyVibe: Local post or Firebase not initialized for dislikePost');
-      return;
-    }
     const userId = localStorage.getItem('userId') || Date.now().toString();
     localStorage.setItem('userId', userId);
+
+    if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
+      console.log('JoyVibe: Storing dislike locally for post:', id);
+      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+      const post = localPosts.find(p => p.id === id);
+      if (post) {
+        // Check if user already disliked locally
+        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
+        if (!localActions[id]) {
+          post.dislikes = (post.dislikes || 0) + 1;
+          localActions[id] = { userId, action: 'disliked' };
+          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+          localStorage.setItem('pendingActions', JSON.stringify(localActions));
+          console.log('JoyVibe: Locally disliked post:', id);
+          updateBubble({ id, ...post, userAction: 'disliked' });
+        }
+      }
+      return;
+    }
+
     const userActionRef = postsCollection.doc(id).collection('user_actions').doc(userId);
     const existing = await userActionRef.get();
     if (existing.exists) {
