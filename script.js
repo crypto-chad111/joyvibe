@@ -1,43 +1,4 @@
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBBJjQ8nZwPVNCPgsTg821Sr0T0PVZD2No",
-  authDomain: "joyvibe-a6775.firebaseapp.com",
-  projectId: "joyvibe-a6775",
-  storageBucket: "joyvibe-a6775.firebasestorage.app",
-  messagingSenderId: "920959691579",
-  appId: "1:920959691579:web:be079e785dd4ce5a5fe51e"
-};
-
-// Initialize Firebase with Retry
-let db, postsCollection;
-let firebaseInitialized = false;
-let authRetryCount = 0;
-const maxAuthRetries = 3;
-
-async function initializeFirebase() {
-  try {
-    console.log('JoyVibe: Attempting Firebase initialization, attempt', authRetryCount + 1);
-    const app = firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    postsCollection = db.collection('posts');
-    await firebase.auth().signInAnonymously();
-    firebaseInitialized = true;
-    console.log('JoyVibe: Firebase initialized successfully');
-    syncLocalPosts();
-    setupRealtime();
-  } catch (err) {
-    console.error('JoyVibe: Firebase initialization failed:', err);
-    if (authRetryCount < maxAuthRetries) {
-      authRetryCount++;
-      console.log('JoyVibe: Retrying Firebase initialization in 2 seconds...');
-      setTimeout(initializeFirebase, 2000);
-    } else {
-      console.error('JoyVibe: All Firebase initialization attempts failed');
-      showError('Unable to connect to Firebase. Using offline mode.');
-      setupOfflineFallback();
-    }
-  }
-}
+// === ORIGINAL NON-FIREBASE CODE (UNCHANGED) ===
 
 // Global Error Handler
 window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -54,106 +15,6 @@ function showError(message) {
     errorMessage.style.display = 'block';
   }
 }
-
-// Offline Fallback
-function setupOfflineFallback() {
-  console.log('JoyVibe: Setting up offline fallback');
-  db = {
-    collection: () => ({
-      add: async (post) => {
-        const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-        const id = 'local-' + Date.now();
-        localPosts.push({ ...post, id, timestamp: new Date() });
-        localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-        console.log('JoyVibe: Post stored locally:', post);
-        return { id };
-      },
-      orderBy: () => ({
-        limit: () => ({
-          get: async () => ({
-            docs: JSON.parse(localStorage.getItem('pendingPosts') || '[]').map(p => ({
-              id: p.id,
-              data: () => p
-            })),
-            empty: false
-          })
-        }),
-        get: async () => ({
-          docs: JSON.parse(localStorage.getItem('pendingPosts') || '[]').map(p => ({
-            id: p.id,
-            data: () => p
-          })),
-          empty: false
-        })
-      }),
-      doc: () => ({
-        collection: () => ({
-          doc: () => ({
-            get: async () => ({ exists: false }),
-            set: async () => {}
-          })
-        }),
-        get: async () => ({ exists: false, data: () => ({}) }),
-        update: async () => {}
-      })
-    })
-  };
-  postsCollection = db.collection('posts');
-}
-
-// Sync Local Posts to Firestore
-async function syncLocalPosts() {
-  if (!firebaseInitialized) return;
-  try {
-    console.log('JoyVibe: Attempting to sync local posts and actions');
-    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-    const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-    if (localPosts.length === 0 && Object.keys(localActions).length === 0) {
-      console.log('JoyVibe: No local posts or actions to sync');
-      return;
-    }
-
-    // Sync posts
-    for (const post of localPosts) {
-      const docRef = await postsCollection.add({
-        text: post.text,
-        likes: post.likes || 0,
-        dislikes: post.dislikes || 0,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      console.log('JoyVibe: Synced local post to Firestore, new ID:', docRef.id);
-      // Sync associated actions
-      if (localActions[post.id]) {
-        const userId = localActions[post.id].userId;
-        const action = localActions[post.id].action;
-        await postsCollection.doc(docRef.id).collection('user_actions').doc(userId).set({
-          action,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        console.log('JoyVibe: Synced local action for post:', docRef.id);
-        delete localActions[post.id];
-      }
-    }
-
-    localStorage.setItem('pendingPosts', '[]');
-    localStorage.setItem('pendingActions', JSON.stringify(localActions));
-    console.log('JoyVibe: Local posts and actions synced, cleared pending');
-    loadRecentPosts();
-  } catch (err) {
-    console.error('JoyVibe: Error syncing local posts:', err);
-  }
-}
-
-// State
-let cloudPaused = false;
-// CHANGED: Removed cloudZoom variable as zoom buttons are removed
-let bubbles = [];
-let ctx, canvas;
-let hoveredBubbleId = null;
-let expandedBubbleId = null;
-let originalBubble = null;
-let originalContainerId = null;
-// END CHANGE
 
 // Starry Background
 function initStars() {
@@ -244,6 +105,7 @@ function toggleMenu() {
 function canPost() {
   try {
     console.log('JoyVibe: Checking post limit');
+    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
     const lastPostTime = localStorage.getItem('lastPostTime');
     if (!lastPostTime) {
       console.log('JoyVibe: No last post time, can post');
@@ -408,145 +270,6 @@ function createBubble(post, isCloud = false) {
   }
 }
 
-// Load Recent Posts
-async function loadRecentPosts() {
-  try {
-    console.log('JoyVibe: Loading recent posts');
-    const container = document.getElementById('recent-posts');
-    if (!container) {
-      console.error('JoyVibe: recent-posts container missing');
-      showError('Failed to find recent posts container.');
-      return;
-    }
-    container.innerHTML = '<p>Loading...</p>';
-
-    let posts = [];
-    if (firebaseInitialized && db && postsCollection) {
-      try {
-        const snapshot = await postsCollection.orderBy('timestamp', 'desc').limit(5).get();
-        posts = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          timestamp: doc.data().timestamp?.toDate() || new Date()
-        }));
-        console.log('JoyVibe: Fetched posts from Firebase:', posts.length);
-      } catch (err) {
-        console.error('JoyVibe: Firebase fetch error:', err);
-        throw err;
-      }
-    }
-
-    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-    posts = [...localPosts, ...posts];
-
-    container.innerHTML = '';
-    if (posts.length === 0) {
-      console.log('JoyVibe: No posts available, showing welcome bubble');
-      posts = [{
-        id: 'fallback-1',
-        text: 'Welcome to JoyVibe! Share your dreams!',
-        likes: 0,
-        dislikes: 0,
-        timestamp: new Date()
-      }];
-    }
-
-    const uniquePosts = Array.from(new Map(posts.map(p => [p.id, p])).values());
-    uniquePosts.forEach(post => {
-      const bubble = createBubble(post);
-      container.appendChild(bubble);
-    });
-    observeBubbles();
-  } catch (err) {
-    console.error('JoyVibe: Error in loadRecentPosts:', err);
-    showError('Failed to load recent posts.');
-    const container = document.getElementById('recent-posts');
-    if (container) {
-      container.innerHTML = '';
-      const fallbackPost = {
-        id: 'fallback-error',
-        text: 'Welcome to JoyVibe! Share your dreams!',
-        likes: 0,
-        dislikes: 0,
-        timestamp: new Date()
-      };
-      const bubble = createBubble(fallbackPost);
-      container.appendChild(bubble);
-      observeBubbles();
-    }
-  }
-}
-
-// Load Feed
-async function loadFeed(sort) {
-  try {
-    console.log('JoyVibe: Loading feed:', sort);
-    const container = document.getElementById('feed-posts');
-    if (!container) {
-      console.error('JoyVibe: feed-posts container missing');
-      showError('Failed to find feed container.');
-      return;
-    }
-    container.innerHTML = '<p>Loading...</p>';
-
-    let posts = [];
-    if (firebaseInitialized && db && postsCollection) {
-      let query = postsCollection;
-      if (sort === 'newest') {
-        query = query.orderBy('timestamp', 'desc');
-      } else if (sort === 'liked') {
-        query = query.orderBy('likes', 'desc');
-      }
-      const snapshot = await query.get();
-      posts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate() || new Date()
-      }));
-      console.log('JoyVibe: Fetched feed posts:', posts.length);
-    }
-
-    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-    posts = [...localPosts, ...posts];
-
-    container.innerHTML = '';
-    if (posts.length === 0) {
-      console.log('JoyVibe: No feed posts, adding fallback bubble');
-      posts = [{
-        id: 'fallback-feed-1',
-        text: 'Explore dreams on JoyVibe!',
-        likes: 0,
-        dislikes: 0,
-        timestamp: new Date()
-      }];
-    }
-
-    const uniquePosts = Array.from(new Map(posts.map(p => [p.id, p])).values());
-    uniquePosts.forEach(post => {
-      const bubble = createBubble(post);
-      container.appendChild(bubble);
-    });
-    observeBubbles();
-  } catch (err) {
-    console.error('JoyVibe: Error in loadFeed:', err);
-    showError('Failed to load feed.');
-    const container = document.getElementById('feed-posts');
-    if (container) {
-      container.innerHTML = '';
-      const fallbackPost = {
-        id: 'fallback-feed-error',
-        text: 'Explore dreams on JoyVibe!',
-        likes: 0,
-        dislikes: 0,
-        timestamp: new Date()
-      };
-      const bubble = createBubble(fallbackPost);
-      container.appendChild(bubble);
-      observeBubbles();
-    }
-  }
-}
-
 // Observe Bubbles
 function observeBubbles() {
   try {
@@ -604,122 +327,7 @@ async function quickPost() {
   }
 }
 
-// Submit Post
-async function submitPost(text) {
-  try {
-    console.log('JoyVibe: Submitting post:', text);
-    if (!firebaseInitialized || !db || !postsCollection) {
-      console.error('JoyVibe: Firebase not initialized in submitPost');
-      throw new Error('Database service not initialized');
-    }
-    const post = {
-      text: sanitizeText(text),
-      likes: 0,
-      dislikes: 0,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    const docRef = await postsCollection.add(post);
-    updatePostTime();
-    console.log('JoyVibe: Post submitted successfully, ID:', docRef.id);
-    return { id: docRef.id };
-  } catch (err) {
-    console.error('JoyVibe: Error in submitPost:', err);
-    showError('Failed to post. Saved offline.');
-    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-    const id = 'local-' + Date.now();
-    localPosts.push({
-      id,
-      text: sanitizeText(text),
-      likes: 0,
-      dislikes: 0,
-      timestamp: new Date()
-    });
-    localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-    return { id };
-  }
-}
-
-// Like/Dislike/Share
-async function likePost(id) {
-  try {
-    const userId = localStorage.getItem('userId') || Date.now().toString();
-    localStorage.setItem('userId', userId);
-
-    if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
-      console.log('JoyVibe: Storing like locally for post:', id);
-      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const post = localPosts.find(p => p.id === id);
-      if (post) {
-        // Check if user already liked locally
-        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-        if (!localActions[id]) {
-          post.likes = (post.likes || 0) + 1;
-          localActions[id] = { userId, action: 'liked' };
-          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-          localStorage.setItem('pendingActions', JSON.stringify(localActions));
-          console.log('JoyVibe: Locally liked post:', id);
-          updateBubble({ id, ...post, userAction: 'liked' });
-        }
-      }
-      return;
-    }
-
-    const userActionRef = postsCollection.doc(id).collection('user_actions').doc(userId);
-    const existing = await userActionRef.get();
-    if (existing.exists) {
-      console.log('JoyVibe: User already acted on post:', id);
-      return;
-    }
-    await userActionRef.set({ action: 'liked', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-    await postsCollection.doc(id).update({
-      likes: firebase.firestore.FieldValue.increment(1)
-    });
-    console.log('JoyVibe: Liked post:', id);
-  } catch (err) {
-    console.error('JoyVibe: Error in likePost:', err);
-  }
-}
-
-async function dislikePost(id) {
-  try {
-    const userId = localStorage.getItem('userId') || Date.now().toString();
-    localStorage.setItem('userId', userId);
-
-    if (id.startsWith('local-') || !firebaseInitialized || !db || !postsCollection) {
-      console.log('JoyVibe: Storing dislike locally for post:', id);
-      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const post = localPosts.find(p => p.id === id);
-      if (post) {
-        // Check if user already disliked locally
-        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-        if (!localActions[id]) {
-          post.dislikes = (post.dislikes || 0) + 1;
-          localActions[id] = { userId, action: 'disliked' };
-          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-          localStorage.setItem('pendingActions', JSON.stringify(localActions));
-          console.log('JoyVibe: Locally disliked post:', id);
-          updateBubble({ id, ...post, userAction: 'disliked' });
-        }
-      }
-      return;
-    }
-
-    const userActionRef = postsCollection.doc(id).collection('user_actions').doc(userId);
-    const existing = await userActionRef.get();
-    if (existing.exists) {
-      console.log('JoyVibe: User already acted on post:', id);
-      return;
-    }
-    await userActionRef.set({ action: 'disliked', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-    await postsCollection.doc(id).update({
-      dislikes: firebase.firestore.FieldValue.increment(1)
-    });
-    console.log('JoyVibe: Disliked post:', id);
-  } catch (err) {
-    console.error('JoyVibe: Error in dislikePost:', err);
-  }
-}
-
+// Share Post
 function sharePost(id) {
   try {
     const url = `https://joyvibe.world/?post=${id}`;
@@ -744,9 +352,9 @@ async function showExpandedBubble(post, containerId, bubbleElement) {
     originalContainerId = containerId;
     originalBubble = bubbleElement;
 
-    if (!post.id.startsWith('local-') && firebaseInitialized && db && postsCollection) {
+    if (!post.id.startsWith('local-') && firebaseInitialized && db && postsCollectionRef) {
       const userId = localStorage.getItem('userId') || Date.now().toString();
-      const userActionDoc = await postsCollection.doc(post.id).collection('user_actions').doc(userId).get();
+      const userActionDoc = await postsCollectionRef.doc(post.id).collection('user_actions').doc(userId).get();
       post.userAction = userActionDoc.exists ? userActionDoc.data().action : null;
     }
 
@@ -893,6 +501,481 @@ function animate() {
   }
 }
 
+// Cloud Controls
+function toggleCloudPause() {
+  try {
+    console.log('JoyVibe: Toggling cloud pause');
+    cloudPaused = !cloudPaused;
+    // CHANGED: Update pause button icon to play (▶️) when paused, pause (⏸️) when playing
+    const pauseButton = document.getElementById('pause-cloud');
+    pauseButton.innerText = cloudPaused ? '▶️' : '⏸️';
+    // END CHANGE
+    if (!cloudPaused && canvas && ctx) {
+      console.log('JoyVibe: Resuming cloud animation');
+      requestAnimationFrame(animate);
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in toggleCloudPause:', err);
+  }
+}
+// CHANGED: Removed zoomCloud function as zoom buttons are removed
+// END CHANGE
+
+// Update Bubble
+async function updateBubble(post) {
+  try {
+    console.log('JoyVibe: Updating bubble for post:', post.id);
+    const bubbles = document.querySelectorAll(`.bubble[data-post-id="${post.id}"]`);
+    bubbles.forEach(bubble => {
+      const isExpanded = bubble.classList.contains('expanded');
+      const isLiked = post.userAction === 'liked';
+      const isDisliked = post.userAction === 'disliked';
+      const text = isExpanded ? sanitizeText(post.text) : sanitizeText(post.text.split(' ').slice(0, 5).join(' ')) + (post.text.length > 30 ? '...' : '');
+      bubble.querySelector('.bubble-content').innerHTML = `
+        <p>${text}</p>
+        <div class="actions">
+          <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
+          <!-- CHANGED: Replaced downward arrow with broken heart for dislike icon -->
+          <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">💔 ${post.dislikes || 0}</span>
+          <!-- END CHANGE -->
+          <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
+        </div>
+      `;
+      if (isExpanded) {
+        const closeButton = document.createElement('button');
+        closeButton.className = 'close-button';
+        closeButton.textContent = 'Close';
+        closeButton.addEventListener('click', e => {
+          e.stopPropagation();
+          closeAllExpandedBubbles();
+        });
+        bubble.appendChild(closeButton);
+      }
+    });
+  } catch (err) {
+    console.error('JoyVibe: Error in updateBubble:', err);
+  }
+}
+
+// Handle Outside Clicks
+document.addEventListener('click', e => {
+  const bubble = e.target.closest('.bubble.expanded');
+  const canvas = e.target.closest('#cloud-canvas');
+  const controls = e.target.closest('.cloud-controls');
+  const nav = e.target.closest('nav');
+  const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
+  if (!bubble && !canvas && !controls && !nav && !isAction && expandedBubbleId) {
+    console.log('JoyVibe: Closing expanded bubbles due to outside click');
+    closeAllExpandedBubbles();
+  }
+});
+
+// State
+let cloudPaused = false;
+// CHANGED: Removed cloudZoom variable as zoom buttons are removed
+let bubbles = [];
+let ctx, canvas;
+let hoveredBubbleId = null;
+let expandedBubbleId = null;
+let originalBubble = null;
+let originalContainerId = null;
+// END CHANGE
+
+// === NEW COMPAT FIREBASE CODE ===
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBBJjQ8nZwPVNCPgsTg821Sr0T0PVZD2No",
+  authDomain: "joyvibe-a6775.firebaseapp.com",
+  projectId: "joyvibe-a6775",
+  storageBucket: "joyvibe-a6775.firebasestorage.app",
+  messagingSenderId: "920959691579",
+  appId: "1:920959691579:web:be079e785dd4ce5a5fe51e"
+};
+
+// Initialize Firebase with Retry
+let app;
+let db;
+let auth;
+let postsCollectionRef;
+let firebaseInitialized = false;
+let authRetryCount = 0;
+const maxAuthRetries = 3;
+
+async function initializeFirebase() {
+  try {
+    console.log('JoyVibe: Attempting Firebase initialization, attempt', authRetryCount + 1);
+    // Compat SDK: Use global firebase.initializeApp
+    app = firebase.initializeApp(firebaseConfig);
+    // Compat SDK: Use global firebase.firestore
+    db = firebase.firestore();
+    // Compat SDK: Use global firebase.auth
+    auth = firebase.auth();
+    // Compat SDK: Use db.collection
+    postsCollectionRef = db.collection('posts');
+    // Compat SDK: Use auth.signInAnonymously
+    await auth.signInAnonymously();
+    firebaseInitialized = true;
+    console.log('JoyVibe: Firebase initialized successfully');
+    syncLocalPosts();
+    setupRealtime();
+  } catch (err) {
+    console.error('JoyVibe: Firebase initialization failed:', err);
+    if (authRetryCount < maxAuthRetries) {
+      authRetryCount++;
+      console.log('JoyVibe: Retrying Firebase initialization in 2 seconds...');
+      setTimeout(initializeFirebase, 2000);
+    } else {
+      console.error('JoyVibe: All Firebase initialization attempts failed');
+      showError('Unable to connect to Firebase. Using offline mode.');
+      setupOfflineFallback();
+    }
+  }
+}
+
+// Offline Fallback
+function setupOfflineFallback() {
+  console.log('JoyVibe: Setting up offline fallback');
+  db = {
+    collection: () => ({
+      add: async (post) => {
+        const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+        const id = 'local-' + Date.now();
+        localPosts.push({ ...post, id, timestamp: new Date() });
+        localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+        console.log('JoyVibe: Post stored locally:', post);
+        return { id };
+      },
+      orderBy: () => ({
+        limit: () => ({
+          get: async () => ({
+            docs: JSON.parse(localStorage.getItem('pendingPosts') || '[]').map(p => ({
+              id: p.id,
+              data: () => p
+            })),
+            empty: false
+          })
+        }),
+        get: async () => ({
+          docs: JSON.parse(localStorage.getItem('pendingPosts') || '[]').map(p => ({
+              id: p.id,
+              data: () => p
+            })),
+            empty: false
+          })
+      }),
+      doc: () => ({
+        collection: () => ({
+          doc: () => ({
+            get: async () => ({ exists: false }),
+            set: async () => {}
+          })
+        }),
+        get: async () => ({ exists: false, data: () => ({}) }),
+        update: async () => {}
+      })
+    })
+  };
+  postsCollectionRef = db.collection('posts');
+}
+
+// Sync Local Posts to Firestore
+async function syncLocalPosts() {
+  if (!firebaseInitialized) return;
+  try {
+    console.log('JoyVibe: Attempting to sync local posts and actions');
+    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+    const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
+    if (localPosts.length === 0 && Object.keys(localActions).length === 0) {
+      console.log('JoyVibe: No local posts or actions to sync');
+      return;
+    }
+
+    // Sync posts
+    for (const post of localPosts) {
+      const docRef = await postsCollectionRef.add({
+        text: post.text,
+        likes: post.likes || 0,
+        dislikes: post.dislikes || 0,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log('JoyVibe: Synced local post to Firestore, new ID:', docRef.id);
+      // Sync associated actions
+      if (localActions[post.id]) {
+        const userId = localActions[post.id].userId;
+        const action = localActions[post.id].action;
+        await postsCollectionRef.doc(docRef.id).collection('user_actions').doc(userId).set({
+          action,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('JoyVibe: Synced local action for post:', docRef.id);
+        delete localActions[post.id];
+      }
+    }
+
+    localStorage.setItem('pendingPosts', '[]');
+    localStorage.setItem('pendingActions', JSON.stringify(localActions));
+    console.log('JoyVibe: Local posts and actions synced, cleared pending');
+    loadRecentPosts();
+  } catch (err) {
+    console.error('JoyVibe: Error syncing local posts:', err);
+  }
+}
+
+// Submit Post
+async function submitPost(text) {
+  try {
+    console.log('JoyVibe: Submitting post:', text);
+    if (!firebaseInitialized || !postsCollectionRef) {
+      console.error('JoyVibe: Firebase not initialized in submitPost');
+      throw new Error('Database service not initialized');
+    }
+    const post = {
+      text: sanitizeText(text),
+      likes: 0,
+      dislikes: 0,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const docRef = await postsCollectionRef.add(post);
+    updatePostTime();
+    console.log('JoyVibe: Post submitted successfully, ID:', docRef.id);
+    return { id: docRef.id };
+  } catch (err) {
+    console.error('JoyVibe: Error in submitPost:', err);
+    showError('Failed to post. Saved offline.');
+    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+    const id = 'local-' + Date.now();
+    localPosts.push({
+      id,
+      text: sanitizeText(text),
+      likes: 0,
+      dislikes: 0,
+      timestamp: new Date()
+    });
+    localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+    return { id };
+  }
+}
+
+// Load Recent Posts
+async function loadRecentPosts() {
+  try {
+    console.log('JoyVibe: Loading recent posts');
+    const container = document.getElementById('recent-posts');
+    if (!container) {
+      console.error('JoyVibe: recent-posts container missing');
+      showError('Failed to find recent posts container.');
+      return;
+    }
+    container.innerHTML = '<p>Loading...</p>';
+
+    let posts = [];
+    if (firebaseInitialized && db && postsCollectionRef) {
+      try {
+        const snapshot = await postsCollectionRef.orderBy('timestamp', 'desc').limit(5).get();
+        posts = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate() || new Date()
+        }));
+        console.log('JoyVibe: Fetched posts from Firebase:', posts.length);
+      } catch (err) {
+        console.error('JoyVibe: Firebase fetch error:', err);
+      }
+    }
+
+    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+    posts = [...localPosts, ...posts];
+
+    container.innerHTML = '';
+    if (posts.length === 0) {
+      console.log('JoyVibe: No posts available, showing welcome bubble');
+      posts = [{
+        id: 'fallback-1',
+        text: 'Welcome to JoyVibe! Share your dreams!',
+        likes: 0,
+        dislikes: 0,
+        timestamp: new Date()
+      }];
+    }
+
+    const uniquePosts = Array.from(new Map(posts.map(p => [p.id, p])).values());
+    uniquePosts.forEach(post => {
+      const bubble = createBubble(post);
+      container.appendChild(bubble);
+    });
+    observeBubbles();
+  } catch (err) {
+    console.error('JoyVibe: Error in loadRecentPosts:', err);
+    showError('Failed to load recent posts.');
+    const container = document.getElementById('recent-posts');
+    if (container) {
+      container.innerHTML = '';
+      const fallbackPost = {
+        id: 'fallback-error',
+        text: 'Welcome to JoyVibe! Share your dreams!',
+        likes: 0,
+        dislikes: 0,
+        timestamp: new Date()
+      };
+      const bubble = createBubble(fallbackPost);
+      container.appendChild(bubble);
+      observeBubbles();
+    }
+  }
+}
+
+// Load Feed
+async function loadFeed(sort) {
+  try {
+    console.log('JoyVibe: Loading feed:', sort);
+    const container = document.getElementById('feed-posts');
+    if (!container) {
+      console.error('JoyVibe: feed-posts container missing');
+      showError('Failed to find feed container.');
+      return;
+    }
+    container.innerHTML = '<p>Loading...</p>';
+
+    let posts = [];
+    if (firebaseInitialized && db && postsCollectionRef) {
+      let query = postsCollectionRef;
+      if (sort === 'newest') {
+        query = postsCollectionRef.orderBy('timestamp', 'desc');
+      } else if (sort === 'liked') {
+        query = postsCollectionRef.orderBy('likes', 'desc');
+      }
+      const snapshot = await query.get();
+      posts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate() || new Date()
+      }));
+      console.log('JoyVibe: Fetched feed posts:', posts.length);
+    }
+
+    const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+    posts = [...localPosts, ...posts];
+
+    container.innerHTML = '';
+    if (posts.length === 0) {
+      console.log('JoyVibe: No feed posts, adding fallback bubble');
+      posts = [{
+        id: 'fallback-feed-1',
+        text: 'Explore dreams on JoyVibe!',
+        likes: 0,
+        dislikes: 0,
+        timestamp: new Date()
+      }];
+    }
+
+    const uniquePosts = Array.from(new Map(posts.map(p => [p.id, p])).values());
+    uniquePosts.forEach(post => {
+      const bubble = createBubble(post);
+      container.appendChild(bubble);
+    });
+    observeBubbles();
+  } catch (err) {
+    console.error('JoyVibe: Error in loadFeed:', err);
+    showError('Failed to load feed.');
+    const container = document.getElementById('feed-posts');
+    if (container) {
+      container.innerHTML = '';
+      const fallbackPost = {
+        id: 'fallback-feed-error',
+        text: 'Explore dreams on JoyVibe!',
+        likes: 0,
+        dislikes: 0,
+        timestamp: new Date()
+      };
+      const bubble = createBubble(fallbackPost);
+      container.appendChild(bubble);
+      observeBubbles();
+    }
+  }
+}
+
+// Like/Dislike
+async function likePost(id) {
+  try {
+    const userId = localStorage.getItem('userId') || Date.now().toString();
+    localStorage.setItem('userId', userId);
+
+    if (id.startsWith('local-') || !firebaseInitialized || !postsCollectionRef) {
+      console.log('JoyVibe: Storing like locally for post:', id);
+      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+      const post = localPosts.find(p => p.id === id);
+      if (post) {
+        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
+        if (!localActions[id]) {
+          post.likes = (post.likes || 0) + 1;
+          localActions[id] = { userId, action: 'liked' };
+          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+          localStorage.setItem('pendingActions', JSON.stringify(localActions));
+          console.log('JoyVibe: Locally liked post:', id);
+          updateBubble({ id, ...post, userAction: 'liked' });
+        }
+      }
+      return;
+    }
+
+    const postDocRef = postsCollectionRef.doc(id);
+    const userActionDocRef = postDocRef.collection('user_actions').doc(userId);
+    const existing = await userActionDocRef.get();
+    if (existing.exists) {
+      console.log('JoyVibe: User already acted on post:', id);
+      return;
+    }
+    await userActionDocRef.set({ action: 'liked', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    await postDocRef.update({
+      likes: firebase.firestore.FieldValue.increment(1)
+    });
+    console.log('JoyVibe: Liked post:', id);
+  } catch (err) {
+    console.error('JoyVibe: Error in likePost:', err);
+  }
+}
+
+async function dislikePost(id) {
+  try {
+    const userId = localStorage.getItem('userId') || Date.now().toString();
+    localStorage.setItem('userId', userId);
+
+    if (id.startsWith('local-') || !firebaseInitialized || !postsCollectionRef) {
+      console.log('JoyVibe: Storing dislike locally for post:', id);
+      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
+      const post = localPosts.find(p => p.id === id);
+      if (post) {
+        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
+        if (!localActions[id]) {
+          post.dislikes = (post.dislikes || 0) + 1;
+          localActions[id] = { userId, action: 'disliked' };
+          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+          localStorage.setItem('pendingActions', JSON.stringify(localActions));
+          console.log('JoyVibe: Locally disliked post:', id);
+          updateBubble({ id, ...post, userAction: 'disliked' });
+        }
+      }
+      return;
+    }
+
+    const postDocRef = postsCollectionRef.doc(id);
+    const userActionDocRef = postDocRef.collection('user_actions').doc(userId);
+    const existing = await userActionDocRef.get();
+    if (existing.exists) {
+      console.log('JoyVibe: User already acted on post:', id);
+      return;
+    }
+    await userActionDocRef.set({ action: 'disliked', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    await postDocRef.update({
+      dislikes: firebase.firestore.FieldValue.increment(1)
+    });
+    console.log('JoyVibe: Disliked post:', id);
+  } catch (err) {
+    console.error('JoyVibe: Error in dislikePost:', err);
+  }
+}
+
 // Dream-Cloud Initialization
 async function initCloud() {
   try {
@@ -917,8 +1000,8 @@ async function initCloud() {
       { id: 'cloud-fallback-2', text: 'Hope', likes: 0, x: canvas.width * 0.7, y: canvas.height * 0.7, vx: -0.5, vy: -0.5, radius: 40 }
     ];
 
-    if (firebaseInitialized && db && postsCollection) {
-      const snapshot = await postsCollection.orderBy('likes', 'desc').limit(20).get();
+    if (firebaseInitialized && db && postsCollectionRef) {
+      const snapshot = await postsCollectionRef.orderBy('likes', 'desc').limit(20).get();
       if (!snapshot.empty) {
         const cloudPosts = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -970,8 +1053,8 @@ async function initCloud() {
               timestamp: new Date()
             };
             showExpandedBubble(post, 'cloud-canvas', null);
-          } else if (firebaseInitialized && db && postsCollection) {
-            postsCollection.doc(b.id).get().then(doc => {
+          } else if (firebaseInitialized && db && postsCollectionRef) {
+            postsCollectionRef.doc(b.id).get().then(doc => {
               if (doc.exists) {
                 showExpandedBubble({ id: doc.id, ...doc.data(), timestamp: doc.data().timestamp?.toDate() || new Date() }, 'cloud-canvas', null);
               }
@@ -1018,8 +1101,8 @@ async function initCloud() {
               timestamp: new Date()
             };
             showExpandedBubble(post, 'cloud-canvas', null);
-          } else if (firebaseInitialized && db && postsCollection) {
-            postsCollection.doc(b.id).get().then(doc => {
+          } else if (firebaseInitialized && db && postsCollectionRef) {
+            postsCollectionRef.doc(b.id).get().then(doc => {
               if (doc.exists) {
                 showExpandedBubble({ id: doc.id, ...doc.data(), timestamp: doc.data().timestamp?.toDate() || new Date() }, 'cloud-canvas', null);
               }
@@ -1043,41 +1126,23 @@ async function initCloud() {
   }
 }
 
-// Cloud Controls
-function toggleCloudPause() {
-  try {
-    console.log('JoyVibe: Toggling cloud pause');
-    cloudPaused = !cloudPaused;
-    // CHANGED: Update pause button icon to play (▶️) when paused, pause (⏸️) when playing
-    const pauseButton = document.getElementById('pause-cloud');
-    pauseButton.innerText = cloudPaused ? '▶️' : '⏸️';
-    // END CHANGE
-    if (!cloudPaused && canvas && ctx) {
-      console.log('JoyVibe: Resuming cloud animation');
-      requestAnimationFrame(animate);
-    }
-  } catch (err) {
-    console.error('JoyVibe: Error in toggleCloudPause:', err);
-  }
-}
-// CHANGED: Removed zoomCloud function as zoom buttons are removed
-// END CHANGE
-
 // Real-Time Subscription
 function setupRealtime() {
   try {
-    if (!firebaseInitialized || !db || !postsCollection) {
+    if (!firebaseInitialized || !postsCollectionRef) {
       console.warn('JoyVibe: Firebase not initialized, skipping realtime subscription');
       return;
     }
     console.log('JoyVibe: Setting up real-time subscription');
-    // Listen for new posts
-    postsCollection.orderBy('timestamp', 'desc').limit(5).onSnapshot(snapshot => {
+    postsCollectionRef.orderBy('timestamp', 'desc').limit(5).onSnapshot(snapshot => {
       console.log('JoyVibe: Real-time update for recent posts');
       loadRecentPosts();
+    }, err => {
+      console.error('JoyVibe: Real-time listener for recent posts failed:', err);
+      showError('Real-time updates failed. Data may not be current.');
     });
-    // Listen for post updates (likes/dislikes)
-    postsCollection.onSnapshot(snapshot => {
+
+    postsCollectionRef.onSnapshot(snapshot => {
       snapshot.docChanges().forEach(change => {
         if (change.type === 'modified') {
           const post = {
@@ -1089,61 +1154,14 @@ function setupRealtime() {
           updateBubble(post);
         }
       });
+    }, err => {
+      console.error('JoyVibe: Real-time listener for posts failed:', err);
     });
     console.log('JoyVibe: Realtime subscription set up');
   } catch (err) {
     console.error('JoyVibe: Error in setupRealtime:', err);
   }
 }
-
-// Update Bubble
-async function updateBubble(post) {
-  try {
-    console.log('JoyVibe: Updating bubble for post:', post.id);
-    const bubbles = document.querySelectorAll(`.bubble[data-post-id="${post.id}"]`);
-    bubbles.forEach(bubble => {
-      const isExpanded = bubble.classList.contains('expanded');
-      const isLiked = post.userAction === 'liked';
-      const isDisliked = post.userAction === 'disliked';
-      const text = isExpanded ? sanitizeText(post.text) : sanitizeText(post.text.split(' ').slice(0, 5).join(' ')) + (post.text.length > 30 ? '...' : '');
-      bubble.querySelector('.bubble-content').innerHTML = `
-        <p>${text}</p>
-        <div class="actions">
-          <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
-          <!-- CHANGED: Replaced downward arrow with broken heart for dislike icon -->
-          <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">💔 ${post.dislikes || 0}</span>
-          <!-- END CHANGE -->
-          <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
-        </div>
-      `;
-      if (isExpanded) {
-        const closeButton = document.createElement('button');
-        closeButton.className = 'close-button';
-        closeButton.textContent = 'Close';
-        closeButton.addEventListener('click', e => {
-          e.stopPropagation();
-          closeAllExpandedBubbles();
-        });
-        bubble.appendChild(closeButton);
-      }
-    });
-  } catch (err) {
-    console.error('JoyVibe: Error in updateBubble:', err);
-  }
-}
-
-// Handle Outside Clicks
-document.addEventListener('click', e => {
-  const bubble = e.target.closest('.bubble.expanded');
-  const canvas = e.target.closest('#cloud-canvas');
-  const controls = e.target.closest('.cloud-controls');
-  const nav = e.target.closest('nav');
-  const isAction = e.target.closest('.actions') || e.target.classList.contains('close-button');
-  if (!bubble && !canvas && !controls && !nav && !isAction && expandedBubbleId) {
-    console.log('JoyVibe: Closing expanded bubbles due to outside click');
-    closeAllExpandedBubbles();
-  }
-});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1165,3 +1183,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadRecentPosts();
   }
 });
+
+// Export functions to window for index.html onclick handlers
+window.toggleMenu = toggleMenu;
+window.showSection = showSection;
+window.quickPost = quickPost;
+window.likePost = likePost;
+window.dislikePost = dislikePost;
+window.sharePost = sharePost;
+window.toggleCloudPause = toggleCloudPause;
