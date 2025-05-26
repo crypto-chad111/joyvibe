@@ -1192,3 +1192,13 @@ window.likePost = likePost;
 window.dislikePost = dislikePost;
 window.sharePost = sharePost;
 window.toggleCloudPause = toggleCloudPause;
+
+// NEW: Function to toggle the zoom effect on the About section logo
+function toggleLogoZoom(logo) {
+  try {
+    console.log('JoyVibe: Toggling logo zoom');
+    logo.classList.toggle('zoomed');
+  } catch (err) {
+    console.error('JoyVibe: Error in toggleLogoZoom:', err);
+  }
+}
