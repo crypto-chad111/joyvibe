@@ -18,7 +18,16 @@
     Error: Unable to connect to the database. Please try again later or contact support.
   </div>
   <nav>
-    <div class="logo">JoyVibe</div>
+    <div class="logo">
+      <a href="/" class="logo-link">
+        <img src="/logo.png" alt="JoyVibe Logo" class="logo-image">
+        <span class="logo-text">JoyVibe</span>
+        <!-- To place the logo to the RIGHT of "JoyVibe", swap the order above:
+        <span class="logo-text">JoyVibe</span>
+        <img src="path/to/logo.png" alt="JoyVibe Logo" class="logo-image">
+        -->
+      </a>
+    </div>
     <button class="menu-toggle" aria-expanded="false" aria-controls="nav-links" onclick="toggleMenu()">
       <span class="hamburger"></span>
     </button>
@@ -63,6 +72,10 @@
 
   <section id="about" class="section hidden">
     <div class="about-content">
+	    <!-- NEW: Add the logo at the top of the about-content -->
+    <div class="about-logo-container">
+      <img src="logo.png" alt="JoyVibe Logo Full View" class="about-logo" onclick="toggleLogoZoom(this)">
+    </div>
       <h2>About JoyVibe</h2>
       <p>In a world yearning for hope, JoyVibe emerges as a beacon of positivity, uniting hearts across nations in a shared vision for a brighter future. Our platform is more than a space to share dreams—it’s a movement to foster global harmony, where every aspiration, no matter how small, ignites inspiration. Here, your hopes and dreams take flight, amplified by the collective love and support of a worldwide community. The more a dream is liked and shared, the brighter it shines, becoming a powerful voice in our global chorus of optimism.</p>
       <p>We envision JoyVibe as the heartbeat of humanity’s aspirations, a place where people from all corners of the earth come together to dream boldly and work toward a safer, better world. Our mission is to inspire you to speak out, to share what truly matters, and to let your vision shape the future. As dreams ripple across our platform, JoyVibe aims to become the world’s trusted gauge of global sentiment—a vibrant reflection of what unites us all.</p>
