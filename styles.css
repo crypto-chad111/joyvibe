@@ -571,3 +571,82 @@ button:hover {
     font-size: 1em;
   }
 }
+
+/* NEW STYLES FOR THE LOGO */
+
+/* Adjust the .logo container to use flexbox for alignment */
+.logo {
+  display: flex;
+  align-items: center;
+}
+
+/* Style the link wrapping the logo and text */
+.logo-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none; /* Remove underline from the link */
+}
+
+/* Style the logo image */
+.logo-image {
+  width: 40px; /* Adjust size as needed */
+  height: 40px;
+  border-radius: 50%; /* Makes the container circular */
+  margin-right: 10px; /* Space between logo and text */
+  box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700; /* Golden glow effect */
+  object-fit: cover; /* Ensures the image fits within the circular container */
+}
+
+/* Style the logo text */
+.logo-text {
+  font-size: 1em; /* Matches the parent .logo font-size (1.8em) */
+  color: #00f7ff;
+  text-shadow: 0 0 5px #00f7ff, 0 0 10px #00f7ff, 0 0 15px #00f7ff;
+}
+
+/* Mobile adjustments for the logo */
+@media (max-width: 768px) {
+  .logo {
+    font-size: 1.5em; /* Slightly smaller font size for mobile */
+  }
+
+  .logo-image {
+    width: 30px; /* Smaller logo size for mobile */
+    height: 30px;
+    margin-right: 8px; /* Slightly less spacing on mobile */
+    box-shadow: 0 0 8px #ffd700, 0 0 15px #ffd700; /* Slightly reduced glow for mobile */
+  }
+}
+/* NEW STYLES FOR THE ABOUT SECTION LOGO */
+
+/* Center the logo container */
+.about-logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px; /* Space between logo and heading */
+}
+
+/* Style the logo image */
+.about-logo {
+  width: 150px; /* Adjust size for full view */
+  height: 150px;
+  border-radius: 50%; /* Keep it circular to match the header logo */
+  box-shadow: 0 0 15px #ffd700, 0 0 25px #ffd700; /* Golden glowing border */
+  object-fit: cover; /* Ensure the image fits within the circular container */
+  cursor: pointer; /* Indicate it’s clickable */
+  transition: transform 0.3s ease; /* Smooth zoom transition */
+}
+
+/* Class for the zoomed state */
+.about-logo.zoomed {
+  transform: scale(1.2); /* Slightly expand/zoom in (20% larger) */
+}
+
+/* Mobile adjustments for the logo in the About section */
+@media (max-width: 768px) {
+  .about-logo {
+    width: 120px; /* Smaller size for mobile */
+    height: 120px;
+    box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700; /* Slightly reduced glow for mobile */
+  }
+}
