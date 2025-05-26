@@ -6,11 +6,27 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <title>JoyVibe - Share Your Happiness</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
-<!-- Firebase SDK -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-auth-compat.js"></script>
+  <!-- NEW: Open Graph and Twitter Card Meta Tags for Social Sharing -->
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:title" content="JoyVibe - Share Your Happiness">
+  <meta property="og:description" content="JoyVibe: A platform to share dreams, inspire hope, and connect with a global community.">
+  <meta property="og:image" content="https://joyvibe.world/logo.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="1200">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:url" content="https://joyvibe.world">
+  <meta property="og:type" content="website">
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="JoyVibe - Share Your Happiness">
+  <meta name="twitter:description" content="JoyVibe: A platform to share dreams, inspire hope, and connect with a global community.">
+  <meta name="twitter:image" content="https://joyvibe.world/logo.png">
+  <!-- END NEW -->
 </head>
 <body>
   <canvas id="stars-canvas"></canvas>
@@ -20,7 +36,7 @@
   <nav>
     <div class="logo">
       <a href="/" class="logo-link">
-        <img src="/logo.png" alt="JoyVibe Logo" class="logo-image">
+        <img src="logo.png" alt="JoyVibe Logo" class="logo-image">
         <span class="logo-text">JoyVibe</span>
         <!-- To place the logo to the RIGHT of "JoyVibe", swap the order above:
         <span class="logo-text">JoyVibe</span>
@@ -104,6 +120,6 @@
       <button onclick="showSection('landing')">Share Your Dream</button>
     </div>
   </section>
-  <script src="/script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
