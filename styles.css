@@ -650,3 +650,170 @@ button:hover {
     box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700; /* Slightly reduced glow for mobile */
   }
 }
+.social-logo {
+  width: 24px; /* Small size */
+  height: 24px;
+  margin: 0 10px; /* Spacing between logos */
+  filter: brightness(0) invert(1); /* Makes logos white */
+  transition: filter 0.3s ease; /* Smooth hover effect */
+}
+
+.social-logo:hover {
+  filter: brightness(0) invert(1) drop-shadow(0 0 5px #00f7ff); /* Neon cyan glow */
+}
+/* Footer Styles */
+footer {
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 20px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.social-links, .legal-links {
+  margin-bottom: 10px;
+}
+
+.social-links a, .legal-links a {
+  color: #00f7ff; /* Cyan to match the neon theme */
+  text-decoration: none;
+  margin: 0 10px;
+  transition: text-shadow 0.3s ease;
+}
+
+.social-links a:hover, .legal-links a:hover {
+  text-shadow: 0 0 5px #00f7ff, 0 0 10px #00f7ff; /* Glowing effect */
+}
+
+#copyright {
+  font-size: 0.9em;
+  color: #f0f0ff; /* Slightly lighter for contrast */
+}
+
+.legal-content {
+  background: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
+  color: #fff; /* White text */
+  padding: 20px;
+  margin: 20px auto;
+  max-width: 800px; /* Readable width */
+  text-align: left;
+  border-radius: 10px;
+}
+
+.legal-content h1 {
+  font-size: 2em;
+  color: #00f7ff; /* Neon cyan */
+  text-shadow: 0 0 5px #00f7ff; /* Subtle glow */
+  margin-bottom: 20px;
+}
+
+.legal-content h2 {
+  font-size: 1.5em;
+  color: #f0f0ff; /* Light text */
+  margin-top: 20px;
+}
+
+.legal-content p, .legal-content ul {
+  font-size: 1em;
+  line-height: 1.6;
+  color: #f0f0ff;
+}
+
+.legal-content ul {
+  margin-left: 20px;
+}
+.social-logo {
+  width: 24px; /* Small size */
+  height: 24px;
+  margin: 0 10px; /* Spacing between logos */
+  filter: brightness(0) invert(1); /* Makes logos white */
+  transition: filter 0.3s ease; /* Smooth hover effect */
+}
+
+.social-logo:hover {
+  filter: brightness(0) invert(1) drop-shadow(0 0 5px #00f7ff); /* Neon cyan glow */
+}
+/* Navigation button styling for links */
+.nav-button {
+  background: linear-gradient(45deg, #ff00ff, #00f7ff); /* Match gradient background */
+  border: none;
+  color: #fff; /* White text to match original buttons */
+  font-family: 'Poppins', sans-serif;
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  padding: 8px 16px; /* Match original padding */
+  border-radius: 5px; /* Match rounded corners */
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.3s; /* Match transition */
+  animation: pulse 2s infinite; /* Match pulse animation */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.nav-button:hover {
+  box-shadow: 0 0 15px #ff00ff, 0 0 20px #00f7ff; /* Match hover effect */
+}
+
+/* Ensure mobile menu styling works */
+@media (max-width: 768px) {
+  .nav-links.show .nav-button {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 8px 16px; /* Match original padding */
+    margin: 5px 0; /* Space between buttons */
+  }
+}
+/* Ensure main content isn't hidden behind fixed nav */
+main {
+  padding-top: 60px; /* Adjust based on nav height */
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-top: 100px; /* Extra padding for mobile to account for nav */
+  }
+
+  .legal-content h1 {
+    margin-top: 0; /* Prevent extra spacing */
+  }
+
+  .nav-links.show .nav-button {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 15px; /* Slightly larger padding for mobile touch targets */
+  }
+}
+@media (max-width: 768px) {
+  main {
+    padding-top: 100px; /* Increase if nav is taller */
+  }
+
+  .legal-content h1 {
+    margin-top: 0;
+  }
+}
+main {
+  padding-top: 60px; /* Adjust based on nav height */
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-top: 80px; /* Extra padding for mobile to account for nav */
+  }
+
+  .legal-content h1 {
+    margin-top: 0; /* Prevent extra spacing */
+  }
+}
