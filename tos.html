@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - JoyVibe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <canvas id="stars-canvas"></canvas>
+
+  <nav>
+    <div class="logo">
+      <a href="index.html" class="logo-link">
+        <img src="logo.png" alt="JoyVibe Logo" class="logo-image">
+        <span class="logo-text">JoyVibe</span>
+      </a>
+    </div>
+    <button class="menu-toggle" aria-expanded="false" aria-controls="nav-links" onclick="toggleMenu()">
+      <span class="hamburger"></span>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="index.html#landing" class="nav-button">Home</a>
+      <a href="index.html#feed" class="nav-button">Explore</a>
+      <a href="index.html#cloud" class="nav-button">Dream-Cloud</a>
+      <a href="index.html#about" class="nav-button">About</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="legal-content">
+  <h1>Terms of Service</h1>
+  <p><strong>Effective Date: May 27, 2025</strong></p>
+
+  <p>By using JoyVibe, you agree to these Terms of Service. Please read them carefully.</p>
+
+  <h2>1. Acceptance of Terms</h2>
+  <p>Using JoyVibe means you accept these Terms and our Privacy Policy. If you disagree, please don’t use our site.</p>
+
+  <h2>2. User Conduct</h2>
+  <p>Use JoyVibe lawfully and respectfully. You may not:
+    <ul>
+      <li>Post offensive, harmful, or illegal content.</li>
+      <li>Try to identify or harass users.</li>
+      <li>Use the site commercially without permission.</li>
+    </ul>
+  </p>
+
+  <h2>3. Content Ownership and Rights</h2>
+  <p>You own your content but grant us a non-exclusive, royalty-free license to display it. Others can view and interact with it.</p>
+
+  <h2>4. Moderation and Enforcement</h2>
+  <p>We can remove violating content and suspend or ban users who break these terms.</p>
+
+  <h2>5. Disclaimer of Warranties</h2>
+  <p>JoyVibe is “as is.” We don’t guarantee results, benefits, or gains. Use it at your own risk.</p>
+
+  <h2>6. Limitation of Liability</h2>
+  <p>We’re not liable for indirect or consequential damages from your use, to the extent allowed by law.</p>
+
+  <h2>7. Future Features and Gamification</h2>
+  <p>Gamification features may be added for entertainment only. They don’t promise real-world benefits, gains, or rewards. Participation is optional.</p>
+
+  <h2>8. Changes to These Terms</h2>
+  <p>We may update these terms. Changes will be posted here, and continued use means acceptance.</p>
+
+  <h2>9. Governing Law</h2>
+  <p>These terms follow the laws of [your jurisdiction]. Disputes go to [your jurisdiction] courts.</p>
+
+  <h2>10. Contact Us</h2>
+  <p>Questions? Email us at [your contact email].</p>
+</section>
+  </main>
+  <footer>
+    <div class="footer-content">
+      <div class="social-links">
+        <a href="https://x.com/yourhandle" target="_blank">
+          <img src="x-logo.png" alt="X" class="social-logo">
+        </a>
+        <a href="https://github.com/yourusername" target="_blank">
+          <img src="github-logo.png" alt="GitHub" class="social-logo">
+        </a>
+      </div>
+      <div class="legal-links">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="tos.html">Terms of Service</a>
+      </div>
+      <p id="copyright">Copyright © <span id="year"></span> JoyVibe. All rights reserved.</p>
+    </div>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
