@@ -150,8 +150,12 @@ nav {
 }
 
 @keyframes drift {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 #cloud > * {
@@ -165,11 +169,26 @@ nav {
 
 .cloud-controls button {
   margin: 0 10px;
+  background: linear-gradient(45deg, #ff00ff, #00f7ff); /* Added for consistency */
+  border: none;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+  animation: pulse 2s infinite;
+}
+
+.cloud-controls button:hover {
+  box-shadow: 0 0 15px #ff00ff, 0 0 20px #00f7ff; /* Added for consistency */
 }
 
 #cloud-canvas {
   width: 100vw;
   height: 100vh;
+  z-index: 5; /* Ensure clickable above background */
+  position: relative;
+  pointer-events: auto; /* Ensure canvas captures clicks */
 }
 
 #about {
@@ -267,9 +286,15 @@ button:hover {
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .hero {
@@ -435,9 +460,15 @@ button:hover {
 }
 
 @keyframes float {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0); }
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {
@@ -654,18 +685,21 @@ footer {
   align-items: center;
 }
 
-.social-links, .legal-links {
+.social-links,
+.legal-links {
   margin-bottom: 10px;
 }
 
-.social-links a, .legal-links a {
+.social-links a,
+.legal-links a {
   color: #00f7ff;
   text-decoration: none;
   margin: 0 10px;
   transition: text-shadow 0.3s ease;
 }
 
-.social-links a:hover, .legal-links a:hover {
+.social-links a:hover,
+.legal-links a:hover {
   text-shadow: 0 0 5px #00f7ff, 0 0 10px #00f7ff;
 }
 
@@ -774,6 +808,7 @@ footer {
   box-shadow: 0 0 10px #ffd700;
   margin: 10px 0;
 }
+
 /* Modal Styles */
 .modal {
   position: fixed;
