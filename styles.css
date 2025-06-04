@@ -467,7 +467,6 @@ button:hover {
     padding: 3px;
   }
 
-  /* CHANGED: Updated mobile styles for expanded bubble to ensure centering, visible close button, and full text visibility */
   .bubble.expanded {
     width: 90vw !important;
     height: auto !important;
@@ -511,7 +510,6 @@ button:hover {
     width: fit-content;
     align-self: center;
   }
-  /* END CHANGE */
 
   nav {
     align-items: flex-start;
@@ -572,95 +570,75 @@ button:hover {
   }
 }
 
-/* NEW STYLES FOR THE LOGO */
-
-/* Adjust the .logo container to use flexbox for alignment */
+/* Logo Styles */
 .logo {
   display: flex;
   align-items: center;
 }
 
-/* Style the link wrapping the logo and text */
 .logo-link {
   display: flex;
   align-items: center;
-  text-decoration: none; /* Remove underline from the link */
+  text-decoration: none;
 }
 
-/* Style the logo image */
 .logo-image {
-  width: 40px; /* Adjust size as needed */
+  width: 40px;
   height: 40px;
-  border-radius: 50%; /* Makes the container circular */
-  margin-right: 10px; /* Space between logo and text */
-  box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700; /* Golden glow effect */
-  object-fit: cover; /* Ensures the image fits within the circular container */
+  border-radius: 50%;
+  margin-right: 10px;
+  box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
+  object-fit: cover;
 }
 
-/* Style the logo text */
 .logo-text {
-  font-size: 1em; /* Matches the parent .logo font-size (1.8em) */
+  font-size: 1em;
   color: #00f7ff;
   text-shadow: 0 0 5px #00f7ff, 0 0 10px #00f7ff, 0 0 15px #00f7ff;
 }
 
-/* Mobile adjustments for the logo */
 @media (max-width: 768px) {
   .logo {
-    font-size: 1.5em; /* Slightly smaller font size for mobile */
+    font-size: 1.5em;
   }
 
   .logo-image {
-    width: 30px; /* Smaller logo size for mobile */
+    width: 30px;
     height: 30px;
-    margin-right: 8px; /* Slightly less spacing on mobile */
-    box-shadow: 0 0 8px #ffd700, 0 0 15px #ffd700; /* Slightly reduced glow for mobile */
+    margin-right: 8px;
+    box-shadow: 0 0 8px #ffd700, 0 0 15px #ffd700;
   }
 }
-/* NEW STYLES FOR THE ABOUT SECTION LOGO */
 
-/* Center the logo container */
+/* About Section Logo */
 .about-logo-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 20px; /* Space between logo and heading */
+  margin-bottom: 20px;
 }
 
-/* Style the logo image */
 .about-logo {
-  width: 150px; /* Adjust size for full view */
+  width: 150px;
   height: 150px;
-  border-radius: 50%; /* Keep it circular to match the header logo */
-  box-shadow: 0 0 15px #ffd700, 0 0 25px #ffd700; /* Golden glowing border */
-  object-fit: cover; /* Ensure the image fits within the circular container */
-  cursor: pointer; /* Indicate it’s clickable */
-  transition: transform 0.3s ease; /* Smooth zoom transition */
+  border-radius: 50%;
+  box-shadow: 0 0 15px #ffd700, 0 0 25px #ffd700;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.3s ease;
 }
 
-/* Class for the zoomed state */
 .about-logo.zoomed {
-  transform: scale(1.2); /* Slightly expand/zoom in (20% larger) */
+  transform: scale(1.2);
 }
 
-/* Mobile adjustments for the logo in the About section */
 @media (max-width: 768px) {
   .about-logo {
-    width: 120px; /* Smaller size for mobile */
+    width: 120px;
     height: 120px;
-    box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700; /* Slightly reduced glow for mobile */
+    box-shadow: 0 0 10px #ffd700, 0 0 20px #ffd700;
   }
 }
-.social-logo {
-  width: 24px; /* Small size */
-  height: 24px;
-  margin: 0 10px; /* Spacing between logos */
-  filter: brightness(0) invert(1); /* Makes logos white */
-  transition: filter 0.3s ease; /* Smooth hover effect */
-}
 
-.social-logo:hover {
-  filter: brightness(0) invert(1) drop-shadow(0 0 5px #00f7ff); /* Neon cyan glow */
-}
 /* Footer Styles */
 footer {
   background: rgba(0, 0, 0, 0.7);
@@ -681,139 +659,142 @@ footer {
 }
 
 .social-links a, .legal-links a {
-  color: #00f7ff; /* Cyan to match the neon theme */
+  color: #00f7ff;
   text-decoration: none;
   margin: 0 10px;
   transition: text-shadow 0.3s ease;
 }
 
 .social-links a:hover, .legal-links a:hover {
-  text-shadow: 0 0 5px #00f7ff, 0 0 10px #00f7ff; /* Glowing effect */
+  text-shadow: 0 0 5px #00f7ff, 0 0 10px #00f7ff;
 }
 
 #copyright {
   font-size: 0.9em;
-  color: #f0f0ff; /* Slightly lighter for contrast */
-}
-
-.legal-content {
-  background: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
-  color: #fff; /* White text */
-  padding: 20px;
-  margin: 20px auto;
-  max-width: 800px; /* Readable width */
-  text-align: left;
-  border-radius: 10px;
-}
-
-.legal-content h1 {
-  font-size: 2em;
-  color: #00f7ff; /* Neon cyan */
-  text-shadow: 0 0 5px #00f7ff; /* Subtle glow */
-  margin-bottom: 20px;
-}
-
-.legal-content h2 {
-  font-size: 1.5em;
-  color: #f0f0ff; /* Light text */
-  margin-top: 20px;
-}
-
-.legal-content p, .legal-content ul {
-  font-size: 1em;
-  line-height: 1.6;
   color: #f0f0ff;
 }
 
-.legal-content ul {
-  margin-left: 20px;
-}
 .social-logo {
-  width: 24px; /* Small size */
+  width: 24px;
   height: 24px;
-  margin: 0 10px; /* Spacing between logos */
-  filter: brightness(0) invert(1); /* Makes logos white */
-  transition: filter 0.3s ease; /* Smooth hover effect */
+  margin: 0 10px;
+  filter: brightness(0) invert(1);
+  transition: filter 0.3s ease;
 }
 
 .social-logo:hover {
-  filter: brightness(0) invert(1) drop-shadow(0 0 5px #00f7ff); /* Neon cyan glow */
+  filter: brightness(0) invert(1) drop-shadow(0 0 5px #00f7ff);
 }
-/* Navigation button styling for links */
-.nav-button {
-  background: linear-gradient(45deg, #ff00ff, #00f7ff); /* Match gradient background */
+
+/* Trail Map Styles */
+#trail-map {
+  text-align: center;
+}
+
+#trail-map-canvas {
+  width: 100vw;
+  height: 80vh;
+  background: transparent;
+  z-index: 5; /* Ensure above background but below modals */
+  position: relative;
+  pointer-events: auto; /* Ensure clickable */
+}
+
+/* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #0a0a23;
+  border: 2px solid #ff00ff;
+  border-radius: 10px;
+  padding: 20px;
+  max-width: 500px;
+  width: 90%;
+  color: #fff;
+  box-shadow: 0 0 20px #ff00ff, 0 0 40px #00f7ff;
+  text-align: center;
+}
+
+#create-trail-form {
+  display: flex;
+  flex-direction: column;
+}
+
+#create-trail-form label {
+  margin-bottom: 5px;
+  text-align: left;
+}
+
+#create-trail-form textarea,
+#create-trail-form input {
+  margin-bottom: 15px;
+  padding: 10px;
+  border: 1px solid #ff00ff;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+#create-trail-form button,
+#trail-view-modal button {
+  background: linear-gradient(45deg, #ff00ff, #00f7ff);
   border: none;
-  color: #fff; /* White text to match original buttons */
-  font-family: 'Poppins', sans-serif;
-  font-size: 1em;
-  font-weight: 400;
-  line-height: 1;
+  color: #fff;
+  padding: 10px;
   cursor: pointer;
-  padding: 8px 16px; /* Match original padding */
-  border-radius: 5px; /* Match rounded corners */
-  text-decoration: none;
-  display: inline-block;
-  transition: all 0.3s; /* Match transition */
-  animation: pulse 2s infinite; /* Match pulse animation */
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
+  border-radius: 5px;
+  transition: all 0.3s;
+  width: 48%;
 }
 
-.nav-button:hover {
-  box-shadow: 0 0 15px #ff00ff, 0 0 20px #00f7ff; /* Match hover effect */
+#create-trail-form button:hover,
+#trail-view-modal button:hover {
+  box-shadow: 0 0 15px #ff00ff, 0 0 20px #00f7ff;
 }
 
-/* Ensure mobile menu styling works */
-@media (max-width: 768px) {
-  .nav-links.show .nav-button {
-    display: block;
-    width: 100%;
-    text-align: center;
-    padding: 8px 16px; /* Match original padding */
-    margin: 5px 0; /* Space between buttons */
-  }
+#trailhead-image-display {
+  max-width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #ffd700;
+  margin: 10px 0;
 }
-/* Ensure main content isn't hidden behind fixed nav */
-main {
-  padding-top: 60px; /* Adjust based on nav height */
-}
-
-@media (max-width: 768px) {
-  main {
-    padding-top: 100px; /* Extra padding for mobile to account for nav */
-  }
-
-  .legal-content h1 {
-    margin-top: 0; /* Prevent extra spacing */
-  }
-
-  .nav-links.show .nav-button {
-    display: block;
-    width: 100%;
-    text-align: center;
-    padding: 15px; /* Slightly larger padding for mobile touch targets */
-  }
-}
-@media (max-width: 768px) {
-  main {
-    padding-top: 100px; /* Increase if nav is taller */
-  }
-
-  .legal-content h1 {
-    margin-top: 0;
-  }
-}
-main {
-  padding-top: 60px; /* Adjust based on nav height */
+/* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-@media (max-width: 768px) {
-  main {
-    padding-top: 80px; /* Extra padding for mobile to account for nav */
-  }
+#create-trail-modal {
+  z-index: 1000;
+}
 
-  .legal-content h1 {
-    margin-top: 0; /* Prevent extra spacing */
-  }
+#trail-view-modal {
+  z-index: 1001; /* Higher than create-trail-modal */
+}
+
+.hidden {
+  display: none;
 }
