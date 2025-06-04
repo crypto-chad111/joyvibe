@@ -1,5 +1,5 @@
 // === ORIGINAL NON-FIREBASE CODE (UNCHANGED) ===
-
+console.log('script.js loaded');
 // Global Error Handler
 window.onerror = function(msg, url, lineNo, columnNo, error) {
   console.error('JoyVibe: Global error:', msg, 'Line:', lineNo, 'Column:', columnNo, 'Error:', error, 'Stack:', error?.stack);
@@ -125,6 +125,10 @@ function showSection(sectionId) {
       console.log('JoyVibe: Loading recent posts for section:', sectionId);
       loadRecentPosts();
     }
+    if (sectionId === 'trail-map') {
+      console.log('JoyVibe: Initializing trail map for section:', sectionId);
+      initTrailMap();
+    }
     closeAllExpandedBubbles();
   } catch (err) {
     console.error('JoyVibe: Error in showSection:', err);
@@ -158,7 +162,6 @@ function createBubble(post, isCloud = false) {
     if (!isCloud) {
       const isExpanded = expandedBubbleId === post.id;
       bubble.classList.toggle('expanded', isExpanded);
-      // Use a fallback if message or text is missing
       const postText = post.message || post.text || 'No content available';
       if (isExpanded) {
         text = sanitizeText(postText);
@@ -267,7 +270,7 @@ function observeBubbles() {
 // Quick Post
 async function quickPost() {
   try {
-    console.log('JoyVibe: Quick post attempt');
+    console.log('Joy，这次是JoyVibe: Quick post attempt');
     const textArea = document.getElementById('quick-post');
     if (!textArea) {
       console.error('JoyVibe: quick-post textarea missing');
@@ -287,7 +290,6 @@ async function quickPost() {
     }
     const userId = user.uid;
 
-    // Check for recent posts by this user (30-minute rule)
     const postsRef = firebase.firestore().collection('posts');
     const recentPostsQuery = postsRef
       .where('userId', '==', userId)
@@ -299,7 +301,7 @@ async function quickPost() {
       const lastPost = recentPostsSnapshot.docs[0].data();
       const lastPostTimestamp = lastPost.timestamp.toDate();
       const now = new Date();
-      const timeDiffMinutes = (now - lastPostTimestamp) / (1000 * 60); // Convert to minutes
+      const timeDiffMinutes = (now - lastPostTimestamp) / (1000 * 60);
 
       if (timeDiffMinutes < 30) {
         const minutesLeft = Math.ceil(30 - timeDiffMinutes);
@@ -308,7 +310,6 @@ async function quickPost() {
       }
     }
 
-    // Submit the post
     const result = await submitPost(text, userId);
     textArea.value = '';
     if (result && result.id.startsWith('local-')) {
@@ -575,7 +576,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBBJjQ8nZwPVNCPgsTg821Sr0T0PVZD2No",
   authDomain: "joyvibe-a6775.firebaseapp.com",
   projectId: "joyvibe-a6775",
-  storageBucket: "joyvibe-a6775.firebasestorage.app",
+  storageBucket: "joyvibe-a6775.appspot.com",
   messagingSenderId: "920959691579",
   appId: "1:920959691579:web:be079e785dd4ce5a5fe51e"
 };
@@ -584,7 +585,9 @@ const firebaseConfig = {
 let app;
 let db;
 let auth;
+let storage;
 let postsCollectionRef;
+let trailsCollectionRef;
 let firebaseInitialized = false;
 let authRetryCount = 0;
 const maxAuthRetries = 3;
@@ -595,7 +598,9 @@ async function initializeFirebase() {
     app = firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
+    storage = firebase.storage(); // Added for image uploads
     postsCollectionRef = db.collection('posts');
+    trailsCollectionRef = db.collection('trails'); // Added for trails
     await auth.signInAnonymously();
     firebaseInitialized = true;
     console.log('JoyVibe: Firebase initialized successfully');
@@ -640,11 +645,11 @@ function setupOfflineFallback() {
         }),
         get: async () => ({
           docs: JSON.parse(localStorage.getItem('pendingPosts') || '[]').map(p => ({
-              id: p.id,
-              data: () => p
-            })),
-            empty: false
-          })
+            id: p.id,
+            data: () => p
+          })),
+          empty: false
+        })
       }),
       doc: () => ({
         collection: () => ({
@@ -680,7 +685,6 @@ async function syncLocalPosts() {
     }
     const userId = user.uid;
 
-    // Sync posts
     for (const post of localPosts) {
       const docRef = await postsCollectionRef.add({
         message: post.text,
@@ -691,7 +695,6 @@ async function syncLocalPosts() {
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
       console.log('JoyVibe: Synced local post to Firestore, new ID:', docRef.id);
-      // Sync associated actions
       if (localActions[post.id]) {
         const actionUserId = localActions[post.id].userId;
         const action = localActions[post.id].action;
@@ -763,7 +766,6 @@ async function loadRecentPosts() {
     }
     container.innerHTML = '<p>Loading...</p>';
 
-    // Wait for authentication to complete
     let user = firebase.auth().currentUser;
     if (!user) {
       await new Promise((resolve) => {
@@ -801,7 +803,7 @@ async function loadRecentPosts() {
         console.log('JoyVibe: Fetched posts from Firebase:', posts.length);
       } catch (err) {
         console.error('JoyVibe: Firebase fetch error:', err);
-        throw err; // Re-throw to handle in the outer catch block
+        throw err;
       }
     }
 
@@ -865,7 +867,6 @@ async function loadFeed(sort) {
     }
     container.innerHTML = '<p>Loading...</p>';
 
-    // Wait for authentication to complete
     let user = firebase.auth().currentUser;
     if (!user) {
       await new Promise((resolve) => {
@@ -892,7 +893,7 @@ async function loadFeed(sort) {
         let userAction = null;
         if (userId) {
           const reactionDoc = await postsCollectionRef.doc(doc.id).collection('reactions').doc(userId).get();
-          userAction = reactionDoc.exists ? reactionDoc.data().type : null;
+        userAction = reactionDoc.exists ? reactionDoc.data().type : null;
         }
         return {
           id: doc.id,
@@ -961,7 +962,7 @@ async function likePost(id) {
   try {
     const user = firebase.auth().currentUser;
     if (!user) {
-      showError('User not authenticated. Please refresh the page and try again.');
+      showError('User not authenticated. Please refresh the page and try armasgain.');
       return;
     }
     const userId = user.uid;
@@ -987,7 +988,6 @@ async function likePost(id) {
     const postDocRef = postsCollectionRef.doc(id);
     const reactionDocRef = postDocRef.collection('reactions').doc(userId);
 
-    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
       const reactionDoc = await transaction.get(reactionDocRef);
       if (reactionDoc.exists) {
@@ -1038,7 +1038,6 @@ async function dislikePost(id) {
     const postDocRef = postsCollectionRef.doc(id);
     const reactionDocRef = postDocRef.collection('reactions').doc(userId);
 
-    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
       const reactionDoc = await transaction.get(reactionDocRef);
       if (reactionDoc.exists) {
@@ -1269,34 +1268,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const errorMessage = document.getElementById('error-message');
     if (errorMessage) errorMessage.style.display = 'none';
 
-    // Always initialize the starry background
-    initStars();
+    // Ensure modals are hidden on load
+    closeCreateTrailModal();
+    closeTrailView();
 
-    // Update copyright year dynamically
+    initStars();
     const yearSpan = document.getElementById('year');
     if (yearSpan) {
       yearSpan.textContent = new Date().getFullYear();
     }
 
-    // Check if we're on the main page (index.html) by looking for a section
     const isMainPage = document.querySelector('.section');
     if (isMainPage) {
       console.log('JoyVibe: Detected main page, running full initialization');
       await initializeFirebase();
       await loadRecentPosts();
 
-      // Check URL hash and show the corresponding section
       const hash = window.location.hash.replace('#', '');
-      if (hash && ['landing', 'feed', 'cloud', 'about'].includes(hash)) {
+      if (hash && ['landing', 'feed', 'cloud', 'about', 'trail-map'].includes(hash)) {
         showSection(hash);
       } else {
-        showSection('landing'); // Default to landing if no valid hash
+        showSection('landing');
       }
 
       console.log('JoyVibe: Main page initialization complete');
     } else {
       console.log('JoyVibe: Detected secondary page, only starry background and copyright year initialized');
-      await initializeFirebase(); // Still initialize Firebase to ensure auth for reactions
+      await initializeFirebase();
     }
   } catch (err) {
     console.error('JoyVibe: Initialization error:', err);
@@ -1307,6 +1305,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
+function closeTrailView() {
+  try {
+    console.log('JoyVibe: Closing trail view modal');
+    const modal = document.getElementById('trail-view-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      console.log('JoyVibe: Trail view modal hidden');
+    } else {
+      console.error('JoyVibe: trail-view-modal not found');
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in closeTrailView:', err);
+  }
+}
 
 // Export functions to window for onclick handlers
 window.toggleMenu = toggleMenu;
@@ -1317,3 +1329,294 @@ window.dislikePost = dislikePost;
 window.sharePost = sharePost;
 window.toggleCloudPause = toggleCloudPause;
 window.toggleLogoZoom = toggleLogoZoom;
+
+// === NEW TRAILS FEATURE ===
+
+// Open Create Trail Modal
+function openCreateTrailModal() {
+  const modal = document.getElementById('create-trail-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+  } else {
+    console.error('Create Trail modal not found');
+  }
+}
+
+// Close Create Trail Modal
+function closeCreateTrailModal() {
+  const modal = document.getElementById('create-trail-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    document.getElementById('trailhead-text').value = ''; // Clear text
+    document.getElementById('trailhead-image').value = ''; // Clear file input
+  }
+}
+
+// Create Trailhead
+async function createTrailhead(text, imageFile) {
+  try {
+    const user = firebase.auth().currentUser;
+    if (!user) {
+      showError('User not authenticated. Please refresh the page and try again.');
+      return;
+    }
+    const userId = user.uid;
+
+    let imageUrl = null;
+    if (imageFile) {
+      const storageRef = firebase.storage().ref();
+      const imageRef = storageRef.child(`trailheads/${userId}/${Date.now()}_${imageFile.name}`);
+      await imageRef.put(imageFile);
+      imageUrl = await imageRef.getDownloadURL();
+      console.log('JoyVibe: Image uploaded, URL:', imageUrl);
+    }
+
+    const trail = {
+      userId,
+      trailhead: {
+        text: sanitizeText(text),
+        imageUrl,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      markers: [] // Placeholder for future marker support
+    };
+
+    const docRef = await trailsCollectionRef.add(trail);
+    console.log('JoyVibe: Trail created with ID:', docRef.id);
+    alert('Trailhead created successfully!');
+    initTrailMap(); // Refresh trail map
+  } catch (err) {
+    console.error('JoyVibe: Error creating trail:', err);
+    showError('Failed to create trailhead.');
+  }
+}
+
+// Initialize Trail Map
+async function initTrailMap() {
+  try {
+    console.log('JoyVibe: Initializing Trail Map');
+    const canvas = document.getElementById('trail-map-canvas');
+    if (!canvas) {
+      console.error('JoyVibe: Trail Map canvas not found');
+      showError('Failed to find trail map canvas.');
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Clear existing event listeners
+    canvas.onclick = null;
+
+    let trails = [];
+    if (firebaseInitialized && db && trailsCollectionRef) {
+      try {
+        const user = firebase.auth().currentUser;
+        if (!user) {
+          console.error('JoyVibe: No authenticated user for trail fetch');
+          showError('Please refresh the page to authenticate.');
+          return;
+        }
+        const snapshot = await trailsCollectionRef.get();
+        trails = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            text: data.trailhead.text,
+            imageUrl: data.trailhead.imageUrl,
+            x: Math.random() * (canvas.width - 40) + 20,
+            y: Math.random() * (canvas.height - 40) + 20,
+            radius: 20
+          };
+        });
+        console.log('JoyVibe: Fetched trails:', trails);
+      } catch (err) {
+        console.error('JoyVibe: Error fetching trails:', err);
+        showError('Failed to load trails.');
+      }
+    } else {
+      console.warn('JoyVibe: Firebase not initialized, using fallback trail');
+      trails.push({
+        id: 'test-trail',
+        text: 'Test Trailhead',
+        imageUrl: null,
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 20
+      });
+    }
+
+    // Render trails
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    trails.forEach(trail => {
+      ctx.beginPath();
+      ctx.arc(trail.x, trail.y, trail.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.closePath();
+      ctx.fillStyle = '#333';
+      ctx.font = '12px Poppins';
+      ctx.textAlign = 'center';
+      ctx.fillText(trail.text.slice(0, 10) + (trail.text.length > 10 ? '...' : ''), trail.x, trail.y + trail.radius + 10);
+    });
+
+    // Click handler
+    canvas.onclick = e => {
+      try {
+        console.log('JoyVibe: Canvas clicked at', e.clientX, e.clientY);
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        console.log('JoyVibe: Canvas coords:', { mouseX, mouseY });
+        for (let trail of trails) {
+          const dist = Math.sqrt((mouseX - trail.x) ** 2 + (mouseY - trail.y) ** 2);
+          console.log('JoyVibe: Trail', trail.id, 'dist:', dist, 'radius:', trail.radius);
+          if (dist <= trail.radius) {
+            console.log('JoyVibe: Opening trail:', trail.id);
+            openTrailView(trail.id);
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('JoyVibe: Click handler error:', err);
+      }
+    };
+  } catch (err) {
+    console.error('JoyVibe: Error in initTrailMap:', err);
+    showError('Failed to initialize trail map.');
+  }
+}
+
+// Open Trail View Modal
+async function openTrailView(trailId) {
+  try {
+    console.log('JoyVibe: Opening trail view modal for trail:', trailId);
+    closeCreateTrailModal();
+    closeAllExpandedBubbles();
+    const modal = document.getElementById('trail-view-modal');
+    if (!modal) {
+      console.error('JoyVibe: Trail view modal not found');
+      return;
+    }
+    modal.classList.remove('hidden');
+
+    if (trailId === 'test-trail') {
+      // Handle test trailhead
+      const textElement = document.getElementById('trailhead-text-display');
+      const imageElement = document.getElementById('trailhead-image-display');
+      if (textElement) textElement.textContent = 'Test Trailhead';
+      if (imageElement) imageElement.style.display = 'none';
+      console.log('JoyVibe: Displayed test trailhead');
+    } else if (firebaseInitialized && db && trailsCollectionRef) {
+      const doc = await trailsCollectionRef.doc(trailId).get();
+      if (doc.exists) {
+        const data = doc.data();
+        const textElement = document.getElementById('trailhead-text-display');
+        const imageElement = document.getElementById('trailhead-image-display');
+        if (textElement) textElement.textContent = data.trailhead.text;
+        if (imageElement) {
+          if (data.trailhead.imageUrl) {
+            imageElement.src = data.trailhead.imageUrl;
+            imageElement.style.display = 'block';
+          } else {
+            imageElement.style.display = 'none';
+          }
+        }
+      } else {
+        console.error('JoyVibe: Trail not found:', trailId);
+        showError('Trail not found.');
+      }
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in openTrailView:', err);
+    showError('Failed to load trail details.');
+  }
+}
+
+// Close Trail View Modal
+function closeTrailView() {
+  const modal = document.getElementById('trail-view-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+// Event Listener for Trail Creation Form
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('create-trail-form');
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const text = document.getElementById('trailhead-text').value.trim();
+      const imageFile = document.getElementById('trailhead-image').files[0];
+      if (!text) {
+        alert('Please enter trailhead text.');
+        return;
+      }
+      await createTrailhead(text, imageFile);
+      closeCreateTrailModal();
+    });
+  }
+});
+function openCreateTrailModal() {
+  closeTrailView(); // Close Trailhead Details modal
+  const modal = document.getElementById('create-trail-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function openTrailView(trailId) {
+  closeCreateTrailModal(); // Close Create Trailhead modal
+  const modal = document.getElementById('trail-view-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+async function openTrailView(trailId) {
+  try {
+    console.log('JoyVibe: Opening trail view for:', trailId);
+    closeCreateTrailModal();
+    closeAllExpandedBubbles();
+    const modal = document.getElementById('trail-view-modal');
+    if (!modal) {
+      console.error('JoyVibe: Trail view modal not found');
+      return;
+    }
+    modal.classList.remove('hidden');
+
+    if (trailId === 'test-trail') {
+      const textElement = document.getElementById('trailhead-text-display');
+      const imageElement = document.getElementById('trailhead-image-display');
+      if (textElement) textElement.textContent = 'Test Trailhead';
+      if (imageElement) imageElement.style.display = 'none';
+      console.log('JoyVibe: Displayed test trailhead');
+    } else if (firebaseInitialized && db && trailsCollectionRef) {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        console.error('JoyVibe: No authenticated user');
+        showError('Please refresh the page to authenticate.');
+        modal.classList.add('hidden');
+        return;
+      }
+      const doc = await trailsCollectionRef.doc(trailId).get();
+      if (doc.exists) {
+        const data = doc.data();
+        const textElement = document.getElementById('trailhead-text-display');
+        const imageElement = document.getElementById('trailhead-image-display');
+        if (textElement) textElement.textContent = data.trailhead.text;
+        if (imageElement) {
+          if (data.trailhead.imageUrl) {
+            imageElement.src = data.trailhead.imageUrl;
+            imageElement.style.display = 'block';
+          } else {
+            imageElement.style.display = 'none';
+          }
+        }
+      } else {
+        console.error('JoyVibe: Trail not found:', trailId);
+        showError('Trail not found.');
+      }
+    }
+  } catch (err) {
+    console.error('JoyVibe: Error in openTrailView:', err);
+    showError('Failed to load trail details.');
+  }
+}
