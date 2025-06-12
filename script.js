@@ -1,8 +1,7 @@
-// === ORIGINAL NON-FIREBASE CODE (UNCHANGED WHERE POSSIBLE) ===
-console.log('script.js loaded');
+// === ORIGINAL NON-FIREBASE CODE (UNCHANGED) ===
 
 // Global Error Handler
-window.onerror = function (msg, url, lineNo, columnNo, error) {
+window.onerror = function(msg, url, lineNo, columnNo, error) {
   console.error('JoyVibe: Global error:', msg, 'Line:', lineNo, 'Column:', columnNo, 'Error:', error, 'Stack:', error?.stack);
   showError('Site issue detected. Check console (F12).');
   return false;
@@ -14,11 +13,7 @@ function showError(message) {
   if (errorMessage) {
     errorMessage.textContent = message;
     errorMessage.style.display = 'block';
-    setTimeout(() => {
-      errorMessage.style.display = 'none';
-    }, 5000); // Hide after 5 seconds
   }
-  console.error('JoyVibe: Error displayed:', message);
 }
 
 // Starry Background
@@ -120,7 +115,7 @@ function showSection(sectionId) {
     });
     if (sectionId === 'feed') {
       console.log('JoyVibe: Loading feed for section:', sectionId);
-      debouncedLoadFeed('newest');
+      loadFeed('newest');
     }
     if (sectionId === 'cloud') {
       console.log('JoyVibe: Initializing cloud for section:', sectionId);
@@ -128,11 +123,7 @@ function showSection(sectionId) {
     }
     if (sectionId === 'landing') {
       console.log('JoyVibe: Loading recent posts for section:', sectionId);
-      debouncedLoadRecentPosts();
-    }
-    if (sectionId === 'trail-map') {
-      console.log('JoyVibe: Initializing trail map for section:', sectionId);
-      initTrailMap();
+      loadRecentPosts();
     }
     closeAllExpandedBubbles();
   } catch (err) {
@@ -167,6 +158,7 @@ function createBubble(post, isCloud = false) {
     if (!isCloud) {
       const isExpanded = expandedBubbleId === post.id;
       bubble.classList.toggle('expanded', isExpanded);
+      // Use a fallback if message or text is missing
       const postText = post.message || post.text || 'No content available';
       if (isExpanded) {
         text = sanitizeText(postText);
@@ -272,19 +264,6 @@ function observeBubbles() {
   }
 }
 
-// Debounce Utility
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
 // Quick Post
 async function quickPost() {
   try {
@@ -301,19 +280,14 @@ async function quickPost() {
       return;
     }
 
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
-      });
-    });
-
+    const user = firebase.auth().currentUser;
     if (!user) {
       showError('User not authenticated. Please refresh the page and try again.');
       return;
     }
     const userId = user.uid;
 
+    // Check for recent posts by this user (30-minute rule)
     const postsRef = firebase.firestore().collection('posts');
     const recentPostsQuery = postsRef
       .where('userId', '==', userId)
@@ -325,7 +299,7 @@ async function quickPost() {
       const lastPost = recentPostsSnapshot.docs[0].data();
       const lastPostTimestamp = lastPost.timestamp.toDate();
       const now = new Date();
-      const timeDiffMinutes = (now - lastPostTimestamp) / (1000 * 60);
+      const timeDiffMinutes = (now - lastPostTimestamp) / (1000 * 60); // Convert to minutes
 
       if (timeDiffMinutes < 30) {
         const minutesLeft = Math.ceil(30 - timeDiffMinutes);
@@ -334,6 +308,7 @@ async function quickPost() {
       }
     }
 
+    // Submit the post
     const result = await submitPost(text, userId);
     textArea.value = '';
     if (result && result.id.startsWith('local-')) {
@@ -341,7 +316,7 @@ async function quickPost() {
     } else {
       alert('Post submitted successfully!');
     }
-    debouncedLoadRecentPosts();
+    loadRecentPosts();
   } catch (err) {
     console.error('JoyVibe: Error in quickPost:', err);
     alert('Failed to post: ' + (err.message || 'Check console for details.'));
@@ -374,12 +349,7 @@ async function showExpandedBubble(post, containerId, bubbleElement) {
     originalBubble = bubbleElement;
 
     if (!post.id.startsWith('local-') && firebaseInitialized && db && postsCollectionRef) {
-      const user = await new Promise((resolve) => {
-        const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-          unsubscribe();
-          resolve(u);
-        });
-      });
+      const user = firebase.auth().currentUser;
       const userId = user ? user.uid : null;
       if (userId) {
         const reactionDoc = await postsCollectionRef.doc(post.id).collection('reactions').doc(userId).get();
@@ -532,7 +502,7 @@ function toggleCloudPause() {
     console.log('JoyVibe: Toggling cloud pause');
     cloudPaused = !cloudPaused;
     const pauseButton = document.getElementById('pause-cloud');
-    pauseButton.innerText = cloudPaused ? 'Play' : 'Pause';
+    pauseButton.innerText = cloudPaused ? '▶️' : '⏸️';
     if (!cloudPaused && canvas && ctx) {
       console.log('JoyVibe: Resuming cloud animation');
       requestAnimationFrame(animate);
@@ -551,10 +521,7 @@ async function updateBubble(post) {
       const isExpanded = bubble.classList.contains('expanded');
       const isLiked = post.userAction === 'liked';
       const isDisliked = post.userAction === 'disliked';
-      const postText = post.message || post.text || 'No content available';
-      const text = isExpanded
-        ? sanitizeText(postText)
-        : sanitizeText(postText.split(' ').slice(0, 5).join(' ') + (postText.length > 30 ? '...' : ''));
+      const text = isExpanded ? sanitizeText(post.message || post.text) : sanitizeText((post.message || post.text).split(' ').slice(0, 5).join(' ')) + ((post.message || post.text).length > 30 ? '...' : '');
       bubble.querySelector('.bubble-content').innerHTML = `
         <p>${text}</p>
         <div class="actions">
@@ -602,12 +569,13 @@ let originalBubble = null;
 let originalContainerId = null;
 
 // === NEW COMPAT FIREBASE CODE ===
+
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBBJjQ8nZwPVNCPgsTg821Sr0T0PVZD2No",
   authDomain: "joyvibe-a6775.firebaseapp.com",
   projectId: "joyvibe-a6775",
-  storageBucket: "joyvibe-a6775.appspot.com",
+  storageBucket: "joyvibe-a6775.firebasestorage.app",
   messagingSenderId: "920959691579",
   appId: "1:920959691579:web:be079e785dd4ce5a5fe51e"
 };
@@ -616,9 +584,7 @@ const firebaseConfig = {
 let app;
 let db;
 let auth;
-let storage;
 let postsCollectionRef;
-let trailsCollectionRef;
 let firebaseInitialized = false;
 let authRetryCount = 0;
 const maxAuthRetries = 3;
@@ -629,9 +595,7 @@ async function initializeFirebase() {
     app = firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
-    storage = firebase.storage();
     postsCollectionRef = db.collection('posts');
-    trailsCollectionRef = db.collection('trails');
     await auth.signInAnonymously();
     firebaseInitialized = true;
     console.log('JoyVibe: Firebase initialized successfully');
@@ -676,11 +640,11 @@ function setupOfflineFallback() {
         }),
         get: async () => ({
           docs: JSON.parse(localStorage.getItem('pendingPosts') || '[]').map(p => ({
-            id: p.id,
-            data: () => p
-          })),
-          empty: false
-        })
+              id: p.id,
+              data: () => p
+            })),
+            empty: false
+          })
       }),
       doc: () => ({
         collection: () => ({
@@ -709,19 +673,14 @@ async function syncLocalPosts() {
       return;
     }
 
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
-      });
-    });
-
+    const user = firebase.auth().currentUser;
     if (!user) {
       console.error('JoyVibe: User not authenticated during sync');
       return;
     }
     const userId = user.uid;
 
+    // Sync posts
     for (const post of localPosts) {
       const docRef = await postsCollectionRef.add({
         message: post.text,
@@ -732,6 +691,7 @@ async function syncLocalPosts() {
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
       console.log('JoyVibe: Synced local post to Firestore, new ID:', docRef.id);
+      // Sync associated actions
       if (localActions[post.id]) {
         const actionUserId = localActions[post.id].userId;
         const action = localActions[post.id].action;
@@ -747,7 +707,7 @@ async function syncLocalPosts() {
     localStorage.setItem('pendingPosts', '[]');
     localStorage.setItem('pendingActions', JSON.stringify(localActions));
     console.log('JoyVibe: Local posts and actions synced, cleared pending');
-    debouncedLoadRecentPosts();
+    loadRecentPosts();
   } catch (err) {
     console.error('JoyVibe: Error syncing local posts:', err);
   }
@@ -758,20 +718,8 @@ async function submitPost(text, userId) {
   try {
     console.log('JoyVibe: Submitting post:', text);
     if (!firebaseInitialized || !postsCollectionRef) {
-      console.warn('JoyVibe: Firebase not initialized, saving post locally');
-      const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const id = 'local-' + Date.now();
-      localPosts.push({
-        id,
-        text: sanitizeText(text),
-        likes: 0,
-        dislikes: 0,
-        shares: 0,
-        userId: userId,
-        timestamp: new Date()
-      });
-      localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-      return { id };
+      console.error('JoyVibe: Firebase not initialized in submitPost');
+      throw new Error('Database service not initialized');
     }
     const post = {
       message: sanitizeText(text),
@@ -781,13 +729,6 @@ async function submitPost(text, userId) {
       userId: userId,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
-    if (typeof post.message !== 'string' ||
-        typeof post.likes !== 'number' ||
-        typeof post.dislikes !== 'number' ||
-        typeof post.shares !== 'number' ||
-        typeof post.userId !== 'string') {
-      throw new Error('Invalid post data structure');
-    }
     const docRef = await postsCollectionRef.add(post);
     console.log('JoyVibe: Post submitted successfully, ID:', docRef.id);
     return { id: docRef.id };
@@ -822,12 +763,17 @@ async function loadRecentPosts() {
     }
     container.innerHTML = '<p>Loading...</p>';
 
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
+    // Wait for authentication to complete
+    let user = firebase.auth().currentUser;
+    if (!user) {
+      await new Promise((resolve) => {
+        const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
+          user = u;
+          unsubscribe();
+          resolve();
+        });
       });
-    });
+    }
     const userId = user ? user.uid : null;
 
     let posts = [];
@@ -843,11 +789,11 @@ async function loadRecentPosts() {
           }
           return {
             id: doc.id,
-            message: data.message || 'No content',
-            likes: data.likes || 0,
-            dislikes: data.dislikes || 0,
-            shares: data.shares || 0,
-            userId: data.userId || '',
+            message: data.message,
+            likes: data.likes,
+            dislikes: data.dislikes,
+            shares: data.shares,
+            userId: data.userId,
             timestamp: data.timestamp?.toDate() || new Date(),
             userAction: userAction
           };
@@ -855,7 +801,7 @@ async function loadRecentPosts() {
         console.log('JoyVibe: Fetched posts from Firebase:', posts.length);
       } catch (err) {
         console.error('JoyVibe: Firebase fetch error:', err);
-        throw err;
+        throw err; // Re-throw to handle in the outer catch block
       }
     }
 
@@ -919,12 +865,17 @@ async function loadFeed(sort) {
     }
     container.innerHTML = '<p>Loading...</p>';
 
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
+    // Wait for authentication to complete
+    let user = firebase.auth().currentUser;
+    if (!user) {
+      await new Promise((resolve) => {
+        const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
+          user = u;
+          unsubscribe();
+          resolve();
+        });
       });
-    });
+    }
     const userId = user ? user.uid : null;
 
     let posts = [];
@@ -945,11 +896,11 @@ async function loadFeed(sort) {
         }
         return {
           id: doc.id,
-          message: data.message || 'No content',
-          likes: data.likes || 0,
-          dislikes: data.dislikes || 0,
-          shares: data.shares || 0,
-          userId: data.userId || '',
+          message: data.message,
+          likes: data.likes,
+          dislikes: data.dislikes,
+          shares: data.shares,
+          userId: data.userId,
           timestamp: data.timestamp?.toDate() || new Date(),
           userAction: userAction
         };
@@ -1008,13 +959,7 @@ async function loadFeed(sort) {
 // Like/Dislike
 async function likePost(id) {
   try {
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
-      });
-    });
-
+    const user = firebase.auth().currentUser;
     if (!user) {
       showError('User not authenticated. Please refresh the page and try again.');
       return;
@@ -1042,6 +987,7 @@ async function likePost(id) {
     const postDocRef = postsCollectionRef.doc(id);
     const reactionDocRef = postDocRef.collection('reactions').doc(userId);
 
+    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
       const reactionDoc = await transaction.get(reactionDocRef);
       if (reactionDoc.exists) {
@@ -1054,8 +1000,8 @@ async function likePost(id) {
     });
 
     console.log('JoyVibe: Liked post:', id);
-    await debouncedLoadRecentPosts();
-    await debouncedLoadFeed('newest');
+    await loadRecentPosts();
+    await loadFeed('newest');
   } catch (err) {
     console.error('JoyVibe: Error in likePost:', err);
     showError(err.message || 'Failed to like the post.');
@@ -1064,13 +1010,7 @@ async function likePost(id) {
 
 async function dislikePost(id) {
   try {
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
-      });
-    });
-
+    const user = firebase.auth().currentUser;
     if (!user) {
       showError('User not authenticated. Please refresh the page and try again.');
       return;
@@ -1098,6 +1038,7 @@ async function dislikePost(id) {
     const postDocRef = postsCollectionRef.doc(id);
     const reactionDocRef = postDocRef.collection('reactions').doc(userId);
 
+    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
       const reactionDoc = await transaction.get(reactionDocRef);
       if (reactionDoc.exists) {
@@ -1110,8 +1051,8 @@ async function dislikePost(id) {
     });
 
     console.log('JoyVibe: Disliked post:', id);
-    await debouncedLoadRecentPosts();
-    await debouncedLoadFeed('newest');
+    await loadRecentPosts();
+    await loadFeed('newest');
   } catch (err) {
     console.error('JoyVibe: Error in dislikePost:', err);
     showError(err.message || 'Failed to dislike the post.');
@@ -1278,51 +1219,40 @@ function setupRealtime() {
       return;
     }
     console.log('JoyVibe: Setting up real-time subscription');
+    postsCollectionRef.orderBy('timestamp', 'desc').limit(5).onSnapshot(snapshot => {
+      console.log('JoyVibe: Real-time update for recent posts');
+      loadRecentPosts();
+    }, err => {
+      console.error('JoyVibe: Real-time listener for recent posts failed:', err);
+      showError('Real-time updates failed. Data may not be current.');
+    });
 
-    postsCollectionRef.orderBy('timestamp', 'desc').limit(5).onSnapshot(
-      snapshot => {
-        console.log('JoyVibe: Real-time update for recent posts');
-        debouncedLoadRecentPosts();
-      },
-      err => {
-        console.error('JoyVibe: Real-time listener for recent posts failed:', err);
-        showError('Real-time updates failed. Data may not be current.');
-      }
-    );
-
-    postsCollectionRef.onSnapshot(
-      snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === 'modified') {
-            const data = change.doc.data();
-            const post = {
-              id: change.doc.id,
-              message: data.message || 'No content',
-              likes: data.likes || 0,
-              dislikes: data.dislikes || 0,
-              shares: data.shares || 0,
-              userId: data.userId || '',
-              timestamp: data.timestamp?.toDate() || new Date()
-            };
-            console.log('JoyVibe: Post updated:', post.id);
-            updateBubble(post);
-          }
-        });
-      },
-      err => {
-        console.error('JoyVibe: Real-time listener for posts failed:', err);
-        showError('Real-time updates failed. Data may not be current.');
-      }
-    );
-
+    postsCollectionRef.onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'modified') {
+          const post = {
+            id: change.doc.id,
+            message: change.doc.data().message,
+            likes: change.doc.data().likes,
+            dislikes: change.doc.data().dislikes,
+            shares: change.doc.data().shares,
+            userId: change.doc.data().userId,
+            timestamp: change.doc.data().timestamp?.toDate() || new Date()
+          };
+          console.log('JoyVibe: Post updated:', post.id);
+          updateBubble(post);
+        }
+      });
+    }, err => {
+      console.error('JoyVibe: Real-time listener for posts failed:', err);
+    });
     console.log('JoyVibe: Realtime subscription set up');
   } catch (err) {
     console.error('JoyVibe: Error in setupRealtime:', err);
-    showError('Failed to set up real-time updates.');
   }
 }
 
-// Toggle Logo Zoom
+// Function to toggle the zoom effect on the About section logo
 function toggleLogoZoom(logo) {
   try {
     console.log('JoyVibe: Toggling logo zoom');
@@ -1333,316 +1263,48 @@ function toggleLogoZoom(logo) {
 }
 
 // Initialize
-const debouncedLoadRecentPosts = debounce(loadRecentPosts, 300);
-const debouncedLoadFeed = debounce(loadFeed, 300);
-
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     console.log('JoyVibe: Initializing at', new Date().toISOString());
     const errorMessage = document.getElementById('error-message');
     if (errorMessage) errorMessage.style.display = 'none';
 
-    closeCreateTrailModal();
-    closeTrailView();
-
+    // Always initialize the starry background
     initStars();
+
+    // Update copyright year dynamically
     const yearSpan = document.getElementById('year');
     if (yearSpan) {
       yearSpan.textContent = new Date().getFullYear();
     }
 
+    // Check if we're on the main page (index.html) by looking for a section
     const isMainPage = document.querySelector('.section');
     if (isMainPage) {
       console.log('JoyVibe: Detected main page, running full initialization');
       await initializeFirebase();
-      if (firebaseInitialized) {
-        await debouncedLoadRecentPosts();
-      } else {
-        showError('Running in offline mode. Some features may be limited.');
-      }
+      await loadRecentPosts();
 
+      // Check URL hash and show the corresponding section
       const hash = window.location.hash.replace('#', '');
-      if (hash && ['landing', 'feed', 'cloud', 'about', 'trail-map'].includes(hash)) {
+      if (hash && ['landing', 'feed', 'cloud', 'about'].includes(hash)) {
         showSection(hash);
       } else {
-        showSection('landing');
+        showSection('landing'); // Default to landing if no valid hash
       }
 
       console.log('JoyVibe: Main page initialization complete');
     } else {
       console.log('JoyVibe: Detected secondary page, only starry background and copyright year initialized');
-      await initializeFirebase();
+      await initializeFirebase(); // Still initialize Firebase to ensure auth for reactions
     }
   } catch (err) {
     console.error('JoyVibe: Initialization error:', err);
     showError('Site initialization failed. Using offline mode.');
     initStars();
     if (document.querySelector('.section')) {
-      debouncedLoadRecentPosts();
+      loadRecentPosts();
     }
-  }
-});
-
-// === NEW TRAILS FEATURE ===
-function openCreateTrailModal() {
-  try {
-    closeTrailView();
-    const modal = document.getElementById('create-trail-modal');
-    if (modal) modal.classList.remove('hidden');
-    console.log('JoyVibe: Create trail modal opened');
-  } catch (err) {
-    console.error('JoyVibe: Error in openCreateTrailModal:', err);
-  }
-}
-
-function closeCreateTrailModal() {
-  try {
-    console.log('JoyVibe: Closing create trail modal');
-    const modal = document.getElementById('create-trail-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      document.getElementById('trailhead-text').value = '';
-      document.getElementById('trailhead-image').value = '';
-    }
-  } catch (err) {
-    console.error('JoyVibe: Error in closeCreateTrailModal:', err);
-  }
-}
-
-function closeTrailView() {
-  try {
-    console.log('JoyVibe: Closing trail view modal');
-    const modal = document.getElementById('trail-view-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-    }
-  } catch (err) {
-    console.error('JoyVibe: Error in closeTrailView:', err);
-  }
-}
-
-async function createTrailhead(text, imageFile) {
-  try {
-    const user = await new Promise((resolve) => {
-      const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-        unsubscribe();
-        resolve(u);
-      });
-    });
-
-    if (!user) {
-      showError('User not authenticated. Please refresh the page and try again.');
-      return;
-    }
-    const userId = user.uid;
-
-    let imageUrl = null;
-    if (imageFile) {
-      const storageRef = firebase.storage().ref();
-      const imageRef = storageRef.child(`trailheads/${userId}/${Date.now()}_${imageFile.name}`);
-      await imageRef.put(imageFile);
-      imageUrl = await imageRef.getDownloadURL();
-      console.log('JoyVibe: Image uploaded, URL:', imageUrl);
-    }
-
-    const trail = {
-      userId: userId,
-      trailhead: {
-        text: sanitizeText(text),
-        imageUrl: imageUrl,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      },
-      markers: []
-    };
-
-    if (typeof trail.userId !== 'string' ||
-        typeof trail.trailhead.text !== 'string' ||
-        (trail.trailhead.imageUrl !== null && typeof trail.trailhead.imageUrl !== 'string') ||
-        !Array.isArray(trail.markers)) {
-      throw new Error('Invalid trail data structure');
-    }
-
-    const docRef = await trailsCollectionRef.add(trail);
-    console.log('JoyVibe: Trail created with ID:', docRef.id);
-    alert('Trailhead created successfully!');
-    initTrailMap();
-  } catch (err) {
-    console.error('JoyVibe: Error creating trail:', err);
-    showError('Failed to create trailhead.');
-  }
-}
-
-async function initTrailMap() {
-  try {
-    console.log('JoyVibe: Initializing Trail Map');
-    const canvas = document.getElementById('trail-map-canvas');
-    if (!canvas) {
-      console.error('JoyVibe: Trail Map canvas not found');
-      showError('Failed to find trail map canvas.');
-      return;
-    }
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    canvas.onclick = null;
-
-    let trails = [];
-    if (firebaseInitialized && db && trailsCollectionRef) {
-      const user = await new Promise((resolve) => {
-        const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-          unsubscribe();
-          resolve(u);
-        });
-      });
-      if (!user) {
-        console.error('JoyVibe: No authenticated user for trail fetch');
-        showError('Please refresh the page to authenticate.');
-        trails.push({
-          id: 'test-trail',
-          text: 'Test Trailhead',
-          imageUrl: null,
-          x: canvas.width / 2,
-          y: canvas.height / 2,
-          radius: 20
-        });
-      } else {
-        const snapshot = await trailsCollectionRef.get();
-        trails = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            text: data.trailhead.text,
-            imageUrl: data.trailhead.imageUrl,
-            x: Math.random() * (canvas.width - 40) + 20,
-            y: Math.random() * (canvas.height - 40) + 20,
-            radius: 20
-          };
-        });
-        console.log('JoyVibe: Fetched trails:', trails);
-      }
-    } else {
-      console.warn('JoyVibe: Firebase not initialized, using fallback trail');
-      trails.push({
-        id: 'test-trail',
-        text: 'Test Trailhead',
-        imageUrl: null,
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        radius: 20
-      });
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    trails.forEach(trail => {
-      ctx.beginPath();
-      ctx.arc(trail.x, trail.y, trail.radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff';
-      ctx.fill();
-      ctx.closePath();
-      ctx.fillStyle = '#333';
-      ctx.font = '12px Poppins';
-      ctx.textAlign = 'center';
-      ctx.fillText(trail.text.slice(0, 10) + (trail.text.length > 10 ? '...' : ''), trail.x, trail.y + trail.radius + 10);
-    });
-
-    canvas.onclick = e => {
-      try {
-        console.log('JoyVibe: Canvas clicked at', e.clientX, e.clientY);
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        console.log('JoyVibe: Canvas coords:', { mouseX, mouseY });
-        for (let trail of trails) {
-          const dist = Math.sqrt((mouseX - trail.x) ** 2 + (mouseY - trail.y) ** 2);
-          console.log('JoyVibe: Trail', trail.id, 'dist:', dist, 'radius:', trail.radius);
-          if (dist <= trail.radius) {
-            console.log('JoyVibe: Opening trail:', trail.id);
-            openTrailView(trail.id);
-            break;
-          }
-        }
-      } catch (err) {
-        console.error('JoyVibe: Click handler error:', err);
-      }
-    };
-  } catch (err) {
-    console.error('JoyVibe: Error in initTrailMap:', err);
-    showError('Failed to initialize trail map.');
-  }
-}
-
-async function openTrailView(trailId) {
-  try {
-    console.log('JoyVibe: Opening trail view for:', trailId);
-    closeCreateTrailModal();
-    closeAllExpandedBubbles();
-    const modal = document.getElementById('trail-view-modal');
-    if (!modal) {
-      console.error('JoyVibe: Trail view modal not found');
-      return;
-    }
-    modal.classList.remove('hidden');
-
-    if (trailId === 'test-trail') {
-      const textElement = document.getElementById('trailhead-text-display');
-      const imageElement = document.getElementById('trailhead-image-display');
-      if (textElement) textElement.textContent = 'Test Trailhead';
-      if (imageElement) imageElement.style.display = 'none';
-      console.log('JoyVibe: Displayed test trailhead');
-    } else if (firebaseInitialized && db && trailsCollectionRef) {
-      const user = await new Promise((resolve) => {
-        const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
-          unsubscribe();
-          resolve(u);
-        });
-      });
-      if (!user) {
-        console.error('JoyVibe: No authenticated user');
-        showError('Please refresh the page to authenticate.');
-        modal.classList.add('hidden');
-        return;
-      }
-      const doc = await trailsCollectionRef.doc(trailId).get();
-      if (doc.exists) {
-        const data = doc.data();
-        const textElement = document.getElementById('trailhead-text-display');
-        const imageElement = document.getElementById('trailhead-image-display');
-        if (textElement) textElement.textContent = data.trailhead.text;
-        if (imageElement) {
-          if (data.trailhead.imageUrl) {
-            imageElement.src = data.trailhead.imageUrl;
-            imageElement.style.display = 'block';
-          } else {
-            imageElement.style.display = 'none';
-          }
-        }
-      } else {
-        console.error('JoyVibe: Trail not found:', trailId);
-        showError('Trail not found.');
-      }
-    }
-  } catch (err) {
-    console.error('JoyVibe: Error in openTrailView:', err);
-    showError('Failed to load trail details.');
-  }
-}
-
-// Event Listener for Trail Creation Form
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('create-trail-form');
-  if (form) {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const text = document.getElementById('trailhead-text').value.trim();
-      const imageFile = document.getElementById('trailhead-image').files[0];
-      if (!text) {
-        alert('Please enter trailhead text.');
-        return;
-      }
-      await createTrailhead(text, imageFile);
-      closeCreateTrailModal();
-    });
   }
 });
 
@@ -1655,6 +1317,3 @@ window.dislikePost = dislikePost;
 window.sharePost = sharePost;
 window.toggleCloudPause = toggleCloudPause;
 window.toggleLogoZoom = toggleLogoZoom;
-window.openCreateTrailModal = openCreateTrailModal;
-window.closeCreateTrailModal = closeCreateTrailModal;
-window.closeTrailView = closeTrailView;
