@@ -147,17 +147,16 @@ function sanitizeText(text) {
 // Create Bubble
 function createBubble(post, isCloud = false) {
   try {
-    console.log('JoyVibe: Creating bubble for post:', post.id, 'isCloud:', isCloud, 'userAction:', post.userAction, 'isOwnPost:', post.userId === firebase.auth().currentUser?.uid);
+    console.log('JoyVibe: Creating bubble for post:', post.id, 'isCloud:', isCloud);
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     bubble.dataset.postId = post.id;
-    const isLiked = post.userAction === 'liked';
-    const isDisliked = post.userAction === 'disliked';
     let text;
 
     if (!isCloud) {
       const isExpanded = expandedBubbleId === post.id;
       bubble.classList.toggle('expanded', isExpanded);
+      // Use a fallback if message or text is missing
       const postText = post.message || post.text || 'No content available';
       if (isExpanded) {
         text = sanitizeText(postText);
@@ -176,8 +175,8 @@ function createBubble(post, isCloud = false) {
         <div class="bubble-content">
           <p>${text}</p>
           <div class="actions">
-            <span class="${isLiked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isLiked ? '' : `likePost('${post.id}')`}">❤️ ${post.likes || 0}</span>
-            <span class="${isDisliked ? 'disabled' : ''}" onclick="event.stopPropagation(); ${isDisliked ? '' : `dislikePost('${post.id}')`}">💔 ${post.dislikes || 0}</span>
+            <span onclick="event.stopPropagation(); likePost('${post.id}')">❤️ ${post.likes || 0}</span>
+            <span onclick="event.stopPropagation(); dislikePost('${post.id}')">💔 ${post.dislikes || 0}</span>
             <span onclick="event.stopPropagation(); sharePost('${post.id}')">📤 Share</span>
           </div>
         </div>
@@ -353,7 +352,6 @@ async function showExpandedBubble(post, containerId, bubbleElement) {
       if (userId) {
         const reactionDoc = await postsCollectionRef.doc(post.id).collection('reactions').doc(userId).get();
         post.userAction = reactionDoc.exists ? reactionDoc.data().type : null;
-        console.log(`JoyVibe: Expanded bubble post ${post.id}, user ${userId}, isOwnPost: ${post.userId === userId}, userAction: ${post.userAction}`);
       }
     }
 
@@ -597,15 +595,6 @@ async function initializeFirebase() {
     auth = firebase.auth();
     postsCollectionRef = db.collection('posts');
     await auth.signInAnonymously();
-    await new Promise((resolve) => {
-      const unsubscribe = auth.onAuthStateChanged(user => {
-        if (user) {
-          console.log('JoyVibe: User authenticated:', user.uid);
-          unsubscribe();
-          resolve();
-        }
-      });
-    });
     firebaseInitialized = true;
     console.log('JoyVibe: Firebase initialized successfully');
     syncLocalPosts();
@@ -772,13 +761,13 @@ async function loadRecentPosts() {
     }
     container.innerHTML = '<p>Loading...</p>';
 
+    // Wait for authentication to complete
     let user = firebase.auth().currentUser;
     if (!user) {
       await new Promise((resolve) => {
         const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
           user = u;
           unsubscribe();
-          console.log('JoyVibe: Auth state resolved, user:', user ? user.uid : 'null');
           resolve();
         });
       });
@@ -795,7 +784,6 @@ async function loadRecentPosts() {
           if (userId) {
             const reactionDoc = await postsCollectionRef.doc(doc.id).collection('reactions').doc(userId).get();
             userAction = reactionDoc.exists ? reactionDoc.data().type : null;
-            console.log(`JoyVibe: Post ${doc.id}, user ${userId}, isOwnPost: ${data.userId === userId}, userAction: ${userAction}`);
           }
           return {
             id: doc.id,
@@ -811,7 +799,7 @@ async function loadRecentPosts() {
         console.log('JoyVibe: Fetched posts from Firebase:', posts.length);
       } catch (err) {
         console.error('JoyVibe: Firebase fetch error:', err);
-        throw err;
+        throw err; // Re-throw to handle in the outer catch block
       }
     }
 
@@ -863,6 +851,7 @@ async function loadRecentPosts() {
   }
 }
 
+// Load Feed
 async function loadFeed(sort) {
   try {
     console.log('JoyVibe: Loading feed:', sort);
@@ -874,13 +863,13 @@ async function loadFeed(sort) {
     }
     container.innerHTML = '<p>Loading...</p>';
 
+    // Wait for authentication to complete
     let user = firebase.auth().currentUser;
     if (!user) {
       await new Promise((resolve) => {
         const unsubscribe = firebase.auth().onAuthStateChanged((u) => {
           user = u;
           unsubscribe();
-          console.log('JoyVibe: Auth state resolved, user:', user ? user.uid : 'null');
           resolve();
         });
       });
@@ -902,7 +891,6 @@ async function loadFeed(sort) {
         if (userId) {
           const reactionDoc = await postsCollectionRef.doc(doc.id).collection('reactions').doc(userId).get();
           userAction = reactionDoc.exists ? reactionDoc.data().type : null;
-          console.log(`JoyVibe: Post ${doc.id}, user ${userId}, isOwnPost: ${data.userId === userId}, userAction: ${userAction}`);
         }
         return {
           id: doc.id,
@@ -969,61 +957,53 @@ async function loadFeed(sort) {
 // Like/Dislike
 async function likePost(id) {
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      showError('User not authenticated. Please refresh the page and try again.');
-      return;
-    }
-    const userId = user.uid;
+    console.log('JoyVibe: Attempting to like Post ID:', id);
 
     if (id.startsWith('local-') || !firebaseInitialized || !postsCollectionRef) {
       console.log('JoyVibe: Storing like locally for post:', id);
       const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const post = localPosts.find(p => p.id === id);
-      if (post) {
-        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-        if (!localActions[id]) {
-          post.likes = (post.likes || 0) + 1;
-          localActions[id] = { userId, action: 'liked' };
-          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-          localStorage.setItem('pendingActions', JSON.stringify(localActions));
-          console.log('JoyVibe: Locally liked post:', id);
-          updateBubble({ id, ...post, userAction: 'liked' });
-        }
+      const postData = localPosts.find(p => p.id === id);
+      if (postData) {
+        postData.likes = (postData.likes || 0) + 1;
+        localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+        console.log('JoyVibe: Locally liked post:', id);
+        updateBubble({ id, ...postData, userAction: 'liked' });
       }
       return;
     }
 
     const postDocRef = postsCollectionRef.doc(id);
-    const reactionDocRef = postDocRef.collection('reactions').doc(userId);
+    const reactionDocRef = postDocRef.collection('reactions').doc(); // Random ID
 
+    // Validate post existence and fields
+    const postDoc = await postDocRef.get();
+    if (!postDoc.exists) {
+      console.error('JoyVibe: Post does not exist with ID:', id);
+      showError('Post not found.');
+      return;
+    }
+    const postData = postDoc.data();
+    console.log('JoyVibe: Post Data:', postData);
+    if (typeof postData.likes !== 'number' || !Number.isInteger(postData.likes)) {
+      console.error('JoyVibe: Post missing or invalid likes field:', postData);
+      showError('Invalid post data: Likes field is missing or not an integer.');
+      return;
+    }
+
+    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
-      const reactionDoc = await transaction.get(reactionDocRef);
-      if (reactionDoc.exists) {
-        throw new Error('You have already reacted to this post.');
-      }
-      transaction.set(reactionDocRef, { type: 'like', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+      console.log('JoyVibe: Starting transaction for post:', id);
+      transaction.set(reactionDocRef, { 
+        type: 'like', 
+        timestamp: firebase.firestore.FieldValue.serverTimestamp() 
+      });
+      console.log('JoyVibe: Incrementing likes for post:', id);
       transaction.update(postDocRef, {
         likes: firebase.firestore.FieldValue.increment(1)
       });
     });
 
-    console.log('JoyVibe: Liked post:', id);
-    // Fetch updated post data
-    const postDoc = await postDocRef.get();
-    if (postDoc.exists) {
-      const postData = postDoc.data();
-      updateBubble({
-        id: postDoc.id,
-        message: postData.message,
-        likes: postData.likes,
-        dislikes: postData.dislikes,
-        shares: postData.shares,
-        userId: postData.userId,
-        timestamp: postData.timestamp?.toDate() || new Date(),
-        userAction: 'liked'
-      });
-    }
+    console.log('JoyVibe: Successfully liked post:', id);
     await loadRecentPosts();
     await loadFeed('newest');
   } catch (err) {
@@ -1034,61 +1014,53 @@ async function likePost(id) {
 
 async function dislikePost(id) {
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      showError('User not authenticated. Please refresh the page and try again.');
-      return;
-    }
-    const userId = user.uid;
+    console.log('JoyVibe: Attempting to dislike Post ID:', id);
 
     if (id.startsWith('local-') || !firebaseInitialized || !postsCollectionRef) {
       console.log('JoyVibe: Storing dislike locally for post:', id);
       const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const post = localPosts.find(p => p.id === id);
-      if (post) {
-        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-        if (!localActions[id]) {
-          post.dislikes = (post.dislikes || 0) + 1;
-          localActions[id] = { userId, action: 'disliked' };
-          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-          localStorage.setItem('pendingActions', JSON.stringify(localActions));
-          console.log('JoyVibe: Locally disliked post:', id);
-          updateBubble({ id, ...post, userAction: 'disliked' });
-        }
+      const postData = localPosts.find(p => p.id === id);
+      if (postData) {
+        postData.dislikes = (postData.dislikes || 0) + 1;
+        localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+        console.log('JoyVibe: Locally disliked post:', id);
+        updateBubble({ id, ...postData, userAction: 'disliked' });
       }
       return;
     }
 
     const postDocRef = postsCollectionRef.doc(id);
-    const reactionDocRef = postDocRef.collection('reactions').doc(userId);
+    const reactionDocRef = postDocRef.collection('reactions').doc(); // Random ID
 
+    // Validate post existence and fields
+    const postDoc = await postDocRef.get();
+    if (!postDoc.exists) {
+      console.error('JoyVibe: Post does not exist with ID:', id);
+      showError('Post not found.');
+      return;
+    }
+    const postData = postDoc.data();
+    console.log('JoyVibe: Post Data:', postData);
+    if (typeof postData.dislikes !== 'number' || !Number.isInteger(postData.dislikes)) {
+      console.error('JoyVibe: Post missing or invalid dislikes field:', postData);
+      showError('Invalid post data: Dislikes field is missing or not an integer.');
+      return;
+    }
+
+    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
-      const reactionDoc = await transaction.get(reactionDocRef);
-      if (reactionDoc.exists) {
-        throw new Error('You have already reacted to this post.');
-      }
-      transaction.set(reactionDocRef, { type: 'dislike', timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+      console.log('JoyVibe: Starting transaction for post:', id);
+      transaction.set(reactionDocRef, { 
+        type: 'dislike', 
+        timestamp: firebase.firestore.FieldValue.serverTimestamp() 
+      });
+      console.log('JoyVibe: Incrementing dislikes for post:', id);
       transaction.update(postDocRef, {
         dislikes: firebase.firestore.FieldValue.increment(1)
       });
     });
 
-    console.log('JoyVibe: Disliked post:', id);
-    // Fetch updated post data
-    const postDoc = await postDocRef.get();
-    if (postDoc.exists) {
-      const postData = postDoc.data();
-      updateBubble({
-        id: postDoc.id,
-        message: postData.message,
-        likes: postData.likes,
-        dislikes: postData.dislikes,
-        shares: postData.shares,
-        userId: postData.userId,
-        timestamp: postData.timestamp?.toDate() || new Date(),
-        userAction: 'disliked'
-      });
-    }
+    console.log('JoyVibe: Successfully disliked post:', id);
     await loadRecentPosts();
     await loadFeed('newest');
   } catch (err) {
