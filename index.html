@@ -11,8 +11,8 @@
   <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.8.1/firebase-storage-compat.js"></script>
-  <!-- Open Graph and Twitter Card Meta Tags for Social Sharing -->
+  <!-- NEW: Open Graph and Twitter Card Meta Tags for Social Sharing -->
+  <!-- Open Graph Meta Tags -->
   <meta property="og:title" content="JoyVibe - Share Your Happiness">
   <meta property="og:description" content="JoyVibe: A platform to share dreams, inspire hope, and connect with a global community.">
   <meta property="og:image" content="https://joyvibe.world/logo.png">
@@ -21,10 +21,12 @@
   <meta property="og:image:type" content="image/png">
   <meta property="og:url" content="https://joyvibe.world">
   <meta property="og:type" content="website">
+  <!-- Twitter Card Meta Tags -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="JoyVibe - Share Your Happiness">
   <meta name="twitter:description" content="JoyVibe: A platform to share dreams, inspire hope, and connect with a global community.">
   <meta name="twitter:image" content="https://joyvibe.world/logo.png">
+  <!-- END NEW -->
 </head>
 <body>
   <canvas id="stars-canvas"></canvas>
@@ -36,6 +38,10 @@
       <a href="/" class="logo-link">
         <img src="logo.png" alt="JoyVibe Logo" class="logo-image">
         <span class="logo-text">JoyVibe</span>
+        <!-- To place the logo to the RIGHT of "JoyVibe", swap the order above:
+        <span class="logo-text">JoyVibe</span>
+        <img src="path/to/logo.png" alt="JoyVibe Logo" class="logo-image">
+        -->
       </a>
     </div>
     <button class="menu-toggle" aria-expanded="false" aria-controls="nav-links" onclick="toggleMenu()">
@@ -45,8 +51,7 @@
       <button onclick="showSection('landing'); toggleMenu()">Home</button>
       <button onclick="showSection('feed'); toggleMenu()">Explore</button>
       <button onclick="showSection('cloud'); toggleMenu()">Dream-Cloud</button>
-      <button onclick="showSection('trail-map'); toggleMenu()">Trail Map</button>
-	  <button onclick="showSection('about'); toggleMenu()">About</button>
+      <button onclick="showSection('about'); toggleMenu()">About</button>
     </div>
   </nav>
 
@@ -74,16 +79,19 @@
     <div class="cloud-background"></div>
     <h2>Dream-Cloud</h2>
     <div class="cloud-controls">
+      <!-- CHANGED: Removed zoom buttons, updated pause button with ID and emoji -->
       <button id="pause-cloud" onclick="toggleCloudPause()">⏸️</button>
+      <!-- END CHANGE -->
     </div>
     <canvas id="cloud-canvas"></canvas>
   </section>
 
   <section id="about" class="section hidden">
     <div class="about-content">
-      <div class="about-logo-container">
-        <img src="logo.png" alt="JoyVibe Logo Full View" class="about-logo" onclick="toggleLogoZoom(this)">
-      </div>
+	    <!-- NEW: Add the logo at the top of the about-content -->
+    <div class="about-logo-container">
+      <img src="logo.png" alt="JoyVibe Logo Full View" class="about-logo" onclick="toggleLogoZoom(this)">
+    </div>
       <h2>About JoyVibe</h2>
       <p>In a world yearning for hope, JoyVibe emerges as a beacon of positivity, uniting hearts across nations in a shared vision for a brighter future. Our platform is more than a space to share dreams—it’s a movement to foster global harmony, where every aspiration, no matter how small, ignites inspiration. Here, your hopes and dreams take flight, amplified by the collective love and support of a worldwide community. The more a dream is liked and shared, the brighter it shines, becoming a powerful voice in our global chorus of optimism.</p>
       <p>We envision JoyVibe as the heartbeat of humanity’s aspirations, a place where people from all corners of the earth come together to dream boldly and work toward a safer, better world. Our mission is to inspire you to speak out, to share what truly matters, and to let your vision shape the future. As dreams ripple across our platform, JoyVibe aims to become the world’s trusted gauge of global sentiment—a vibrant reflection of what unites us all.</p>
@@ -112,58 +120,23 @@
       <button onclick="showSection('landing')">Share Your Dream</button>
     </div>
   </section>
-
-  <!-- Trail Map Section -->
-  <section id="trail-map" class="section hidden">
-    <h2>Trail Map</h2>
-    <canvas id="trail-map-canvas"></canvas>
-    <button onclick="openCreateTrailModal()">Create Trailhead</button>
-  </section>
-
-  <!-- Create Trail Modal -->
-  <div id="create-trail-modal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Create Trailhead</h3>
-      <form id="create-trail-form">
-        <label for="trailhead-text">Trailhead Text</label>
-        <textarea id="trailhead-text" maxlength="614" required placeholder="Describe your trailhead..."></textarea>
-        <label for="trailhead-image">Trailhead Image (optional)</label>
-        <input type="file" id="trailhead-image" accept="image/*">
-        <div class="modal-buttons">
-          <button type="submit">Create</button>
-          <button type="button" onclick="closeCreateTrailModal()">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Trail View Modal -->
-<div id="trail-view-modal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Trailhead Details</h3>
-    <p id="trailhead-text-display"></p>
-    <img id="trailhead-image-display" alt="Trailhead Image" style="display: none;" />
-    <button onclick="closeTrailView()">Close</button>
-  </div>
-</div>
-
   <footer>
-    <div class="footer-content">
-      <div class="social-links">
-        <a href="https://x.com/Crypto_Chad101" target="_blank">
-          <img src="x-logo.png" alt="X" class="social-logo">
-        </a>
-        <a href="https://github.com/crypto-chad111" target="_blank">
-          <img src="github-logo.png" alt="GitHub" class="social-logo">
-        </a>
-      </div>
-      <div class="legal-links">
-        <a href="privacy.html">Privacy Policy</a>
-        <a href="tos.html">Terms of Service</a>
-      </div>
-      <p id="copyright">Copyright © <span id="year"></span> JoyVibe. All rights reserved.</p>
+  <div class="footer-content">
+    <div class="social-links">
+      <a href="https://x.com/Crypto_Chad101" target="_blank">
+        <img src="x-logo.png" alt="X" class="social-logo">
+      </a>
+      <a href="https://github.com/crypto-chad111" target="_blank">
+        <img src="github-logo.png" alt="GitHub" class="social-logo">
+      </a>
     </div>
-  </footer>
+    <div class="legal-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="tos.html">Terms of Service</a>
+    </div>
+    <p id="copyright">Copyright © <span id="year"></span> JoyVibe. All rights reserved.</p>
+  </div>
+</footer>
   <script src="script.js"></script>
 </body>
 </html>
