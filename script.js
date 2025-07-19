@@ -957,167 +957,118 @@ async function loadFeed(sort) {
 // Like/Dislike
 async function likePost(id) {
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      showError('User not authenticated. Please refresh the page and try again.');
-      return;
-    }
-    const userId = user.uid;
+    console.log('JoyVibe: Attempting to like Post ID:', id);
 
     if (id.startsWith('local-') || !firebaseInitialized || !postsCollectionRef) {
       console.log('JoyVibe: Storing like locally for post:', id);
       const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const post = localPosts.find(p => p.id === id);
-      if (post) {
-        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-        if (!localActions[id]) {
-          post.likes = (post.likes || 0) + 1;
-          localActions[id] = { userId, action: 'liked' };
-          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-          localStorage.setItem('pendingActions', JSON.stringify(localActions));
-          console.log('JoyVibe: Locally liked post:', id);
-          updateBubble({ id, ...post, userAction: 'liked' });
-        }
+      const postData = localPosts.find(p => p.id === id);
+      if (postData) {
+        postData.likes = (postData.likes || 0) + 1;
+        localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+        console.log('JoyVibe: Locally liked post:', id);
+        updateBubble({ id, ...postData, userAction: 'liked' });
       }
       return;
     }
 
     const postDocRef = postsCollectionRef.doc(id);
-    const reactionDocRef = postDocRef.collection('reactions').doc(userId);
+    const reactionDocRef = postDocRef.collection('reactions').doc(); // Random ID
 
+    // Validate post existence and fields
+    const postDoc = await postDocRef.get();
+    if (!postDoc.exists) {
+      console.error('JoyVibe: Post does not exist with ID:', id);
+      showError('Post not found.');
+      return;
+    }
+    const postData = postDoc.data();
+    console.log('JoyVibe: Post Data:', postData);
+    if (typeof postData.likes !== 'number' || !Number.isInteger(postData.likes)) {
+      console.error('JoyVibe: Post missing or invalid likes field:', postData);
+      showError('Invalid post data: Likes field is missing or not an integer.');
+      return;
+    }
+
+    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
-      const reactionDoc = await transaction.get(reactionDocRef);
-      if (reactionDoc.exists) {
-        throw new Error('You have already reacted to this post.');
-      }
-      const postDoc = await transaction.get(postDocRef);
-      if (!postDoc.exists) {
-        throw new Error('Post does not exist.');
-      }
-      const postData = postDoc.data();
-      if (typeof postData.likes !== 'number') {
-        console.error('JoyVibe: Invalid likes field:', postData.likes);
-        throw new Error('Invalid post data: likes is not a number.');
-      }
+      console.log('JoyVibe: Starting transaction for post:', id);
       transaction.set(reactionDocRef, { 
         type: 'like', 
         timestamp: firebase.firestore.FieldValue.serverTimestamp() 
       });
+      console.log('JoyVibe: Incrementing likes for post:', id);
       transaction.update(postDocRef, {
         likes: firebase.firestore.FieldValue.increment(1)
       });
     });
 
-    console.log('JoyVibe: Liked post:', id);
-    // Fetch updated post data
-    const postDoc = await postDocRef.get();
-    if (postDoc.exists) {
-      const postData = postDoc.data();
-      updateBubble({
-        id: postDoc.id,
-        message: postData.message,
-        likes: postData.likes,
-        dislikes: postData.dislikes,
-        shares: postData.shares,
-        userId: postData.userId,
-        timestamp: postData.timestamp?.toDate() || new Date(),
-        userAction: 'liked'
-      });
-    }
+    console.log('JoyVibe: Successfully liked post:', id);
     await loadRecentPosts();
     await loadFeed('newest');
   } catch (err) {
-    console.error('JoyVibe: Error in likePost:', {
-      message: err.message,
-      code: err.code,
-      details: err.details,
-      stack: err.stack
-    });
-    showError(err.message || 'Failed to like the post. Please try again.');
+    console.error('JoyVibe: Error in likePost:', err);
+    showError(err.message || 'Failed to like the post.');
   }
 }
 
 async function dislikePost(id) {
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) {
-      showError('User not authenticated. Please refresh the page and try again.');
-      return;
-    }
-    const userId = user.uid;
+    console.log('JoyVibe: Attempting to dislike Post ID:', id);
 
     if (id.startsWith('local-') || !firebaseInitialized || !postsCollectionRef) {
       console.log('JoyVibe: Storing dislike locally for post:', id);
       const localPosts = JSON.parse(localStorage.getItem('pendingPosts') || '[]');
-      const post = localPosts.find(p => p.id === id);
-      if (post) {
-        const localActions = JSON.parse(localStorage.getItem('pendingActions') || '{}');
-        if (!localActions[id]) {
-          post.dislikes = (post.dislikes || 0) + 1;
-          localActions[id] = { userId, action: 'disliked' };
-          localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
-          localStorage.setItem('pendingActions', JSON.stringify(localActions));
-          console.log('JoyVibe: Locally disliked post:', id);
-          updateBubble({ id, ...post, userAction: 'disliked' });
-        }
+      const postData = localPosts.find(p => p.id === id);
+      if (postData) {
+        postData.dislikes = (postData.dislikes || 0) + 1;
+        localStorage.setItem('pendingPosts', JSON.stringify(localPosts));
+        console.log('JoyVibe: Locally disliked post:', id);
+        updateBubble({ id, ...postData, userAction: 'disliked' });
       }
       return;
     }
 
     const postDocRef = postsCollectionRef.doc(id);
-    const reactionDocRef = postDocRef.collection('reactions').doc(userId);
+    const reactionDocRef = postDocRef.collection('reactions').doc(); // Random ID
 
+    // Validate post existence and fields
+    const postDoc = await postDocRef.get();
+    if (!postDoc.exists) {
+      console.error('JoyVibe: Post does not exist with ID:', id);
+      showError('Post not found.');
+      return;
+    }
+    const postData = postDoc.data();
+    console.log('JoyVibe: Post Data:', postData);
+    if (typeof postData.dislikes !== 'number' || !Number.isInteger(postData.dislikes)) {
+      console.error('JoyVibe: Post missing or invalid dislikes field:', postData);
+      showError('Invalid post data: Dislikes field is missing or not an integer.');
+      return;
+    }
+
+    // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
-      const reactionDoc = await transaction.get(reactionDocRef);
-      if (reactionDoc.exists) {
-        throw new Error('You have already reacted to this post.');
-      }
-      const postDoc = await transaction.get(postDocRef);
-      if (!postDoc.exists) {
-        throw new Error('Post does not exist.');
-      }
-      const postData = postDoc.data();
-      if (typeof postData.dislikes !== 'number') {
-        console.error('JoyVibe: Invalid dislikes field:', postData.dislikes);
-        throw new Error('Invalid post data: dislikes is not a number.');
-      }
+      console.log('JoyVibe: Starting transaction for post:', id);
       transaction.set(reactionDocRef, { 
         type: 'dislike', 
         timestamp: firebase.firestore.FieldValue.serverTimestamp() 
       });
+      console.log('JoyVibe: Incrementing dislikes for post:', id);
       transaction.update(postDocRef, {
         dislikes: firebase.firestore.FieldValue.increment(1)
       });
     });
 
-    console.log('JoyVibe: Disliked post:', id);
-    // Fetch updated post data
-    const postDoc = await postDocRef.get();
-    if (postDoc.exists) {
-      const postData = postDoc.data();
-      updateBubble({
-        id: postDoc.id,
-        message: postData.message,
-        likes: postData.likes,
-        dislikes: postData.dislikes,
-        shares: postData.shares,
-        userId: postData.userId,
-        timestamp: postData.timestamp?.toDate() || new Date(),
-        userAction: 'disliked'
-      });
-    }
+    console.log('JoyVibe: Successfully disliked post:', id);
     await loadRecentPosts();
     await loadFeed('newest');
   } catch (err) {
-    console.error('JoyVibe: Error in dislikePost:', {
-      message: err.message,
-      code: err.code,
-      details: err.details,
-      stack: err.stack
-    });
-    showError(err.message || 'Failed to dislike the post. Please try again.');
+    console.error('JoyVibe: Error in dislikePost:', err);
+    showError(err.message || 'Failed to dislike the post.');
   }
 }
+
 // Dream-Cloud Initialization
 async function initCloud() {
   try {
@@ -1366,6 +1317,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
+function copyTokenAddress() {
+  try {
+    const tokenAddress = document.getElementById('token-address-btn').textContent;
+    navigator.clipboard.writeText(tokenAddress).then(() => {
+      showError('Token address copied to clipboard!', 'success');
+    }).catch(err => {
+      showError('Failed to copy token address.');
+      console.error('Clipboard error:', err);
+    });
+  } catch (err) {
+    showError('An error occurred.');
+    console.error('Copy token error:', err);
+  }
+}
+function showError(message, type = 'error') {
+  const errorMessage = document.getElementById('error-message');
+  errorMessage.textContent = message;
+  errorMessage.className = type; // Add 'success' or 'error' class
+  errorMessage.style.display = 'block';
+  setTimeout(() => errorMessage.style.display = 'none', 5000);
+}
 
 // Export functions to window for onclick handlers
 window.toggleMenu = toggleMenu;
