@@ -817,3 +817,54 @@ main {
     margin-top: 0; /* Prevent extra spacing */
   }
 }
+.token-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.token-btn, .token-purchase-btn {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1rem;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 25px;
+  background: linear-gradient(45deg, #00f7ff, #ff00ff);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 10px #00f7ff, 0 0 20px #ff00ff;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  text-align: center;
+  max-width: 300px; /* Limits button width for long addresses */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.token-btn:hover, .token-purchase-btn:hover {
+  transform: scale(1.1); /* Zoom effect */
+  box-shadow: 0 0 15px #00f7ff, 0 0 25px #ff00ff;
+}
+
+.token-btn:active, .token-purchase-btn:active {
+  transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+  .token-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .token-btn, .token-purchase-btn {
+    font-size: 0.9rem;
+    padding: 8px 15px;
+    max-width: 90%;
+  }
+}
+#error-message.success {
+  background: rgba(0, 255, 0, 0.2);
+  color: #00ff00;
+}
